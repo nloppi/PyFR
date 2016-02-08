@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2011 by Christoph Reller. All rights reserved.
+# Copyright (c) 2012-2015 by Christoph Reller. All rights reserved.
 
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -28,31 +28,29 @@
 # policies, either expressed or implied, of Christoph Reller.
 
 """
-    tikz
-    ~~~~
+    sphinxcontrib.tikz
+    ~~~~~~~~~~~~~~~~~~
 
-    Render TikZ pictures
+    Draw pictures with the TikZ/PGF LaTeX package.
 
-    We make use of
+    See README.rst file for details
 
-    * latex
-    * pdftoppm (part of Poppler)
-    * pnmcrop (part of Netpbm)
-    * pnmtopng (part of Netpbm)
+    Author: Christoph Reller <christoph.reller@gmail.com>
+    Version: 0.4.2
+"""
 
-    Author: Christoph Reller
-    Email: creller@ee.ethz.ch
-    Version: 0.4
-    $Date: 2010-12-17 15:32:57 +0100 (Fri, 17 Dec 2010) $
-    $Revision: 37 $
-"""    
-
+import contextlib
 import tempfile
 import posixpath
 import shutil
 import sys
-from os import path, getcwd, chdir, mkdir, system
-from subprocess import Popen, PIPE, call
+import codecs
+import os
+import re
+
+from os import path, getcwd, chdir
+from string import Template
+from subprocess import Popen, PIPE
 try:
     from hashlib import sha1 as sha
 except ImportError:
@@ -63,71 +61,162 @@ from docutils.parsers.rst import directives
 
 from sphinx.errors import SphinxError
 try:
-    from sphinx.util.osutil import ensuredir, ENOENT, EPIPE
+    from sphinx.util.osutil import ensuredir, ENOENT
 except:
-    from sphinx.util import ensuredir, ENOENT, EPIPE
-    
+    from sphinx.util import ensuredir, ENOENT
+
 from sphinx.util.compat import Directive
+
+_Win_ = sys.platform[0:3] == 'win'
+
+# TODO: Check existence of executables with subprocess.check_call
+
+
+@contextlib.contextmanager
+def changedir(directory):
+    """Context to temporary change directory"""
+    curdir = getcwd()
+    chdir(directory)
+    yield
+    chdir(curdir)
+
+
+def system(command, builder, outfile=None):
+    """Perform a system call, handling errors.
+
+    :param list command: System command to run.
+    :param builder: Sphinx builder object performing the call.
+    :param str outfile: Output file in which to store command output.
+    """
+    binary = command[0]
+    try:
+        process = Popen(command, stdout=PIPE, stderr=PIPE, stdin=PIPE)
+    except OSError as err:
+        if err.errno != ENOENT:   # No such file or directory
+            raise
+        builder.warn('%s command cannot be run' % binary)
+        builder.warn(err)
+        builder._tikz_warned = True
+        return None
+    stdout, stderr = process.communicate()
+    if process.returncode != 0:
+        builder._tikz_warned = True
+        raise TikzExtError('Error (tikz extension): %s exited with error:'
+                           '\n[stderr]\n%s\n[stdout]\n%s'
+                           % (binary, stderr, stdout))
+    if outfile is not None:
+        f = open(outfile, 'wb')
+        f.write(stdout)
+        f.close()
+
 
 class TikzExtError(SphinxError):
     category = 'Tikz extension error'
 
+
 class tikzinline(nodes.Inline, nodes.Element):
     pass
+
 
 def tikz_role(role, rawtext, text, lineno, inliner, option={}, content=[]):
     tikz = utils.unescape(text, restore_backslashes=True)
     return [tikzinline(tikz=tikz)], []
 
+
 class tikz(nodes.Part, nodes.Element):
     pass
+
 
 class TikzDirective(Directive):
     has_content = True
     required_arguments = 0
     optional_arguments = 1
     final_argument_whitespace = True
-    option_spec = {'libs':directives.unchanged,'stringsubst':directives.flag}
+    option_spec = {'libs': directives.unchanged,
+                   'stringsubst': directives.flag,
+                   'include': directives.unchanged}
 
     def run(self):
         node = tikz()
-        if not self.content:
+
+        if 'include' in self.options:
+            node['include'] = self.options['include']
+            env = self.state.document.settings.env
+            rel_filename, filename = env.relfn2path(node['include'])
+            env.note_dependency(rel_filename)
+            try:
+                fp = codecs.open(filename, 'r', 'utf-8')
+                try:
+                    node['tikz'] = '\n' + fp.read() + '\n'
+                finally:
+                    fp.close()
+            except (IOError, OSError):
+                return [self.state.document.reporter.warning(
+                    'External Tikz file %r not found or reading '
+                    'it failed' % filename, line=self.lineno)]
             node['caption'] = ''
-            node['tikz'] = '\n'.join(self.arguments)
+            if self.arguments:
+                node['caption'] = '\n'.join(self.arguments)
         else:
-            node['tikz'] = '\n'.join(self.content)
-            node['caption'] = '\n'.join(self.arguments)
+            if not self.content:
+                node['caption'] = ''
+                node['tikz'] = '\n'.join(self.arguments)
+            else:
+                node['tikz'] = '\n'.join(self.content)
+                node['caption'] = '\n'.join(self.arguments)
+
         node['libs'] = self.options.get('libs', '')
         if 'stringsubst' in self.options:
             node['stringsubst'] = True
         else:
             node['stringsubst'] = False
+        if node['tikz'] == '':
+            return [self.state_machine.reporter.warning(
+                    'Ignoring "tikz" directive without content.',
+                    line=self.lineno)]
         return [node]
 
 DOC_HEAD = r'''
-\documentclass[12pt]{article}
+\documentclass[12pt,preview,tikz]{standalone}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
-\usepackage{amsthm}
-\usepackage{amssymb}
-\usepackage{amsfonts}
-\usepackage{bm}
 \usepackage{tikz}
+\usepackage{pgfplots}
 \usetikzlibrary{%s}
 \pagestyle{empty}
 '''
 
 DOC_BODY = r'''
 \begin{document}
-\begin{tikzpicture}
 %s
-\end{tikzpicture}
 \end{document}
 '''
 
-def render_tikz(self,tikz,libs='',stringsubst=False):
+OUT_EXTENSION = {
+    'GhostScript': 'png',
+    'ImageMagick': 'png',
+    'Netpbm': 'png',
+    'pdf2svg': 'svg',
+    }
+
+
+def cleanup_tikzcode(self, node):
+    tikz = node['tikz']
+    tikz = tikz.replace('\r\n', '\n')
+    tikz = re.sub('^\s*%.*$\n', '', tikz, 0, re.MULTILINE)
+    tikz = re.sub('^\s*$\n', '', tikz, 0, re.MULTILINE)
+    if not tikz.startswith('\\begin{tikzpicture}'):
+        tikz = '\\begin{tikzpicture}\n' + tikz + '\n\\end{tikzpicture}'
+    if 'stringsubst' in node:
+        tikz = Template(tikz).safe_substitute(wd=getcwd().replace('\\', '/'))
+    return tikz
+
+
+def render_tikz(self, node, libs='', stringsubst=False):
+    tikz = cleanup_tikzcode(self, node)
     hashkey = tikz.encode('utf-8')
-    fname = 'tikz-%s.png' % (sha(hashkey).hexdigest())
+    fname = 'tikz-%s.%s' % (sha(hashkey).hexdigest(),
+                            OUT_EXTENSION[self.builder.config.tikz_proc_suite])
     relfn = posixpath.join(self.builder.imgpath, fname)
     outfn = path.join(self.builder.outdir, '_images', fname)
 
@@ -136,152 +225,67 @@ def render_tikz(self,tikz,libs='',stringsubst=False):
 
     if hasattr(self.builder, '_tikz_warned'):
         return None
-    
+
     ensuredir(path.dirname(outfn))
-    curdir = getcwd()
 
     latex = DOC_HEAD % libs
     latex += self.builder.config.tikz_latex_preamble
-    if stringsubst:
-        tikz = tikz % {'wd': curdir}
     latex += DOC_BODY % tikz
-    if isinstance(latex, str):
-        latex = latex.encode('utf-8')
+    latex = latex.encode('utf-8')
 
-    if not hasattr(self.builder, '_tikz_tempdir'):
-        tempdir = self.builder._tikz_tempdir = tempfile.mkdtemp()
-    else:
-        tempdir = self.builder._tikz_tempdir
+    with changedir(self.builder._tikz_tempdir):
 
-    chdir(tempdir)
+        tf = open('tikz.tex', 'wb')
+        tf.write(latex)
+        tf.close()
 
-    tf = open('tikz.tex', 'w')
-    tf.write(latex)
-    tf.close()
+        system(['pdflatex', '--interaction=nonstopmode', 'tikz.tex'],
+               self.builder)
 
-    try:
-        try:
-            p = Popen(['pdflatex', '--interaction=nonstopmode', 'tikz.tex'],
-                      stdout=PIPE, stderr=PIPE)
-        except OSError as err:
-            if err.errno != ENOENT:   # No such file or directory
-                raise
-            self.builder.warn('LaTeX command cannot be run')
+        if self.builder.config.tikz_proc_suite in ['ImageMagick', 'Netpbm']:
+
+            system(['pdftoppm', '-r', '120', '-singlefile', 'tikz.pdf',
+                    'tikz'], self.builder)
+
+            if self.builder.config.tikz_proc_suite == "ImageMagick":
+                if self.builder.config.tikz_transparent:
+                    convert_args = ['-fuzz', '2%', '-transparent', 'white']
+                else:
+                    convert_args = []
+                system(['convert', '-trim'] + convert_args +
+                       ['tikz.ppm', outfn], self.builder)
+
+            elif self.builder.config.tikz_proc_suite == "Netpbm":
+                if self.builder.config.tikz_transparent:
+                    pnm_args = ['-transparent', 'rgb:ff/ff/ff']
+                else:
+                    pnm_args = []
+                system(['pnmtopng'] + pnm_args + ["tikz.ppm"], self.builder,
+                       outfile=outfn)
+
+        elif self.builder.config.tikz_proc_suite == "GhostScript":
+            if self.builder.config.tikz_transparent:
+                device = "pngalpha"
+            else:
+                device = "png256"
+            system(['ghostscript', '-dBATCH', '-dNOPAUSE',
+                    '-sDEVICE=%s' % device, '-sOutputFile=%s' % outfn,
+                    '-r120x120', '-f', 'tikz.pdf'], self.builder)
+        elif self.builder.config.tikz_proc_suite == "pdf2svg":
+            system(['pdf2svg', 'tikz.pdf', outfn], self.builder)
+        else:
             self.builder._tikz_warned = True
-            return None
-    finally:
-        chdir(curdir)
+            raise TikzExtError('Error (tikz extension): Invalid configuration '
+                               'value for tikz_proc_suite')
 
-    stdout, stderr = p.communicate()
-    if p.returncode != 0:
-        raise TikzExtError('Error (tikz extension): latex exited with error:\n'
-                           '[stderr]\n%s\n[stdout]\n%s' % (stderr, stdout))
+        return relfn
 
-    chdir(tempdir)
 
-    # the following does not work for pdf patterns
-    # p1 = Popen(['convert', '-density', '120', '-colorspace', 'rgb',
-    #             '-trim', 'tikz.pdf', outfn], stdout=PIPE, stderr=PIPE)
-    # stdout, stderr = p1.communicate()
-
-    try:
-        p = Popen(['pdftoppm', '-r', '120', 'tikz.pdf', 'tikz'],
-                  stdout=PIPE, stderr=PIPE)
-    except OSError as e:
-        if e.errno != ENOENT:   # No such file or directory
-            raise
-        self.builder.warn('pdftoppm command cannot be run')
-        self.builder.warn(err)
-        self.builder._tikz_warned = True
-        chdir(curdir)
-        return None
-    stdout, stderr = p.communicate()
-    if p.returncode != 0:
-        self.builder._tikz_warned = True
-        raise TikzExtError('Error (tikz extension): pdftoppm exited with error:'
-                           '\n[stderr]\n%s\n[stdout]\n%s' % (stderr, stdout))
-
-    if self.builder.config.tikz_proc_suite == 'ImageMagick':
-        convert_args = []
-        if self.builder.config.tikz_transparent:
-            convert_args = ['-fuzz', '2%', '-transparent', 'white']
-
-        try:
-            p1 = Popen(['convert', '-trim'] + convert_args +
-                       ['tikz-1.ppm', outfn],
-                       stdout=PIPE, stderr=PIPE)
-        except OSError as e:
-            if e.errno != ENOENT:   # No such file or directory
-                raise
-            self.builder.warn('convert command cannot be run')
-            self.builder.warn(err)
-            self.builder._tikz_warned = True
-            chdir(curdir)
-            return None
-        stdout, stderr = p1.communicate()
-        if p1.returncode != 0:
-            self.builder._tikz_warned = True
-            chdir(curdir)
-            raise TikzExtError('Error (tikz extension): convert exited with '
-                               'error:\n[stderr]\n%s\n[stdout]\n%s'
-                               % (stderr, stdout))
-
-    elif self.builder.config.tikz_proc_suite == 'Netpbm':
-        try:
-            p1 = Popen(['pnmcrop', 'tikz-1.ppm'], stdout=PIPE, stderr=PIPE)
-        except OSError as err:
-            if err.errno != ENOENT:   # No such file or directory
-                raise
-            self.builder.warn('pnmcrop command cannot be run:')
-            self.builder.warn(err)
-            self.builder._tikz_warned = True
-            chdir(curdir)
-            return None
-
-        pnm_args = []
-        if self.builder.config.tikz_transparent:
-            pnm_args = ['-transparent', 'white']
-    
-        try:
-            p2 = Popen(['pnmtopng'] + pnm_args, stdin=p1.stdout,
-                       stdout=PIPE, stderr=PIPE)
-        except OSError as err:
-            if err.errno != ENOENT:   # No such file or directory
-                raise
-            self.builder.warn('pnmtopng command cannot be run:')
-            self.builder.warn(err)
-            self.builder._tikz_warned = True
-            chdir(curdir)
-            return None
-    
-        pngdata, stderr2 = p2.communicate()
-        dummy, stderr1 = p1.communicate()
-        if p1.returncode != 0:
-            self.builder._tikz_warned = True
-            raise TikzExtError('Error (tikz extension): pnmcrop exited with '
-                               'error:\n[stderr]\n%s' % (stderr1))
-        if p2.returncode != 0:
-            self.builder._tikz_warned = True
-            raise TikzExtError('Error (tikz extension): pnmtopng exited with '
-                               'error:\n[stderr]\n%s' % (stderr2))
-        f = open(outfn,'wb')
-        f.write(pngdata)
-        f.close()
-
-    else:
-        self.builder._tikz_warned = True
-        chdir(curdir)
-        raise TikzExtError('Error (tikz extension): Invalid configuration '
-                           'value for tikz_proc_suite')
-
-    chdir(curdir)
-    return relfn
-
-def html_visit_tikzinline(self,node):
+def html_visit_tikzinline(self, node):
     libs = self.builder.config.tikz_tikzlibraries
     libs = libs.replace(' ', '').replace('\t', '').strip(', ')
     try:
-        fname = render_tikz(self,node['tikz'],libs);
+        fname = render_tikz(self, node, libs)
     except TikzExtError as exc:
         info = str(exc)[str(exc).find('!'):-1]
         sm = nodes.system_message(info, type='WARNING', level=2,
@@ -298,12 +302,12 @@ def html_visit_tikzinline(self,node):
                          (fname, self.encode(node['tikz']).strip()))
         raise nodes.SkipNode
 
-def html_visit_tikz(self,node):
+
+def html_visit_tikz(self, node):
     libs = self.builder.config.tikz_tikzlibraries + ',' + node['libs']
     libs = libs.replace(' ', '').replace('\t', '').strip(', ')
-
     try:
-        fname = render_tikz(self,node['tikz'],libs,node['stringsubst'])
+        fname = render_tikz(self, node, libs, node['stringsubst'])
     except TikzExtError as exc:
         info = str(exc)[str(exc).find('!'):-1]
         sm = nodes.system_message(info, type='WARNING', level=2,
@@ -326,10 +330,11 @@ def html_visit_tikz(self,node):
         self.body.append('</div>')
         raise nodes.SkipNode
 
+
 def latex_visit_tikzinline(self, node):
     tikz = node['tikz']
     if tikz[0] == '[':
-        cnt,pos = 1,1
+        cnt, pos = 1, 1
         while cnt > 0 and cnt < len(tikz):
             if tikz[pos] == '[':
                 cnt = cnt + 1
@@ -342,18 +347,21 @@ def latex_visit_tikzinline(self, node):
     self.body.append('\\tikz' + tikz + '}')
     raise nodes.SkipNode
 
+
 def latex_visit_tikz(self, node):
+    tikz = cleanup_tikzcode(self, node)
     if node['caption']:
-        latex = '\\begin{figure}[htp]\\centering\\begin{tikzpicture}' + \
-                node['tikz'] + '\\end{tikzpicture}' + '\\caption{' + \
-                self.encode(node['caption']).strip() + '}\\end{figure}'
+        latex = '\\begin{figure}[htp]\\centering' + tikz \
+                + '\\caption{' + self.encode(node['caption']).strip() \
+                + '}\\end{figure}'
     else:
-        latex = '\\begin{center}\\begin{tikzpicture}' + node['tikz'] + \
-            '\\end{tikzpicture}\\end{center}'
+        latex = '\\begin{center}' + tikz + '\\end{center}'
     self.body.append(latex)
 
-def depart_tikz(self,node):
+
+def depart_tikz(self, node):
     pass
+
 
 def cleanup_tempdir(app, exc):
     if exc:
@@ -364,6 +372,29 @@ def cleanup_tempdir(app, exc):
         shutil.rmtree(app.builder._tikz_tempdir)
     except Exception:
         pass
+
+
+def builder_inited(app):
+    app.builder._tikz_tempdir = tempfile.mkdtemp()
+
+    if app.builder.name == "latex":
+        sty_path = os.path.join(app.builder._tikz_tempdir,
+                                "sphinxcontribtikz.sty")
+        sty = open(sty_path, mode="w")
+        sty.write(r"\RequirePackage{tikz}" + "\n")
+        sty.write(r"\RequirePackage{amsmath}" + "\n")
+        sty.write(r"\RequirePackage{amsfonts}" + "\n")
+        sty.write(r"\RequirePackage{pgfplots}" + "\n")
+        sty.write(app.builder.config.tikz_latex_preamble + "\n")
+        tikzlibs = app.builder.config.tikz_tikzlibraries
+        tikzlibs = tikzlibs.replace(' ', '')
+        tikzlibs = tikzlibs.replace('\t', '')
+        tikzlibs = tikzlibs.strip(', ') + "\n"
+        sty.write(r"\usetikzlibrary{%s}" % tikzlibs)
+        sty.close()
+
+        app.builder.config.latex_additional_files.append(sty_path)
+
 
 def setup(app):
     app.add_node(tikz,
@@ -379,3 +410,4 @@ def setup(app):
     app.add_config_value('tikz_transparent', True, 'html')
     app.add_config_value('tikz_proc_suite', 'Netpbm', 'html')
     app.connect('build-finished', cleanup_tempdir)
+    app.connect('builder-inited', builder_inited)

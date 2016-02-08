@@ -353,6 +353,67 @@ Types of `Kernel Generator`_ are related via the following inheritance diagram:
                          pyfr.backends.openmp.generator.OpenMPKernelGenerator
     :parts: 1
 
+Data Structure
+----------------
+
+PyFR stores datasets using backend specific :code:`Matrix` and :code:`MatrixBank` objects. :code:`Matrix` objects
+are individual matrices while the :code:`MatrixBank` objects function as set of matrices having the same shape and which
+can be activated individually. The data storage methodology is essentially defined by initialising `Backend`_
+in the :code:`main.py`. However, the number of matrices, their shapes and contents depend on the
+used `System`_ and `Stepper`_. The Integrator composite class fetches the number of
+required MatrixBanks :code:`nreg = self._stepper_nregs` from `Stepper`_ and passes it as an
+argument together with the :code:`backend` and :code:`mesh` objects for the `System`_ class,
+:code:`systemcls = Systemcls(backend, ... ,mesh, .., nreg)`. When the `System`_ object is initialised a
+method :code:`_load_eles(..., mesh, ..., nreg)` is called, which creates a proxylist that contains
+an `Elements`_ class object for each element type in the mesh. The when element objects are
+initialised they gather the essential information to define the matrices, such as number of solution points,
+dimensions, variables and the numbers of elements from the mesh and basis objects. After, all element
+objects collectively evoke the :code:`_set_backend(backend, nregs)` method that allocates scratch spaces for
+required matrices at the backend, producing the backend specific :code:`Matrix`  and :code:`MatrixBank` objects.
+Additionally, :code:`abus` list is used to keep track of the memory allocation on the CPU side.
+This allows us to exploit already allocated memory to store temporary solution matrices outside of the div F calculation.
+
+In the :code:`backend.MatrixBase`, all matrices are reduced into two dimension where the number of rows is
+the number of solution points, :code:`nupts`, for originally 3D arrays and :code:`ndims*nupts` for 4D arrays. The number
+of columns are :code:`nvars*neles` in both cases. However, padding is added to the columns to adjust their lengths
+to be divisible with the memory alignment requirement :code:`alignb`. The padding at
+the end of the rows (for the last :code:`nvar`) can be neglected in the matrix operations and thus it is not
+considered in the total column count :code:`ncol = shape[-2]*shape[-1] + (1 - shape[-2])*(shape[-1] % -ldmod)`.
+However, the last dimension still needs to be padded in the memory and its taken into account
+in the total padding :code:`shape[-1] -= shape[-1] % -ldmod`. The figure below illustrates the :code:`backend.Matrix`
+structure for a 3D matrix.
+
+..  tikz:: [scale=0.6]
+  \draw[shift={(0.5,0.5)}] (0,0) grid (18,9);
+  \node at (9,10) {$\text{nvars} \cdot \text{neles}$};
+  \node[left] at (0,5) {$\text{nupts}$};
+  \foreach \x in {6} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9} {
+  \node[fill=gray] at (\x,\y) {};;}}
+  \foreach \x in {12} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9} {
+  \node[fill=gray] at (\x,\y) {};;}}
+  \foreach \x in {18} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9} {
+  \node[fill=gray] at (\x,\y) {};;}}
+  \node at (3,-0) {$\text{leadsubdim}$};
+  \draw[->] (0.5,-0.5) -- (5.5,-0.5);
+  \node at (3,-1) {$\text{leaddim}$};
+  \draw[->] (0.5,-1.5) -- (6.5,-1.5);
+  \draw[line width=1mm] (6.5, 0.5) -- (6.5, 9.5);
+  \draw[line width=1mm] (12.5, 0.5) -- (12.5, 9.5);
+  \draw[dashed, line width=0.6mm, dash pattern=on 5pt off 3pt] (17.5, 0.5) -- (17.5, 9.5);
+  \draw[->] (12,-1) -- (6.3,0.2);
+  \draw[->] (12,-1) -- (17.7,0.2);
+  \draw[->] (12,-1) -- (12,0.2);
+  \node at (12,-1.5) {$\text{padding}$};
+
+The low-level kernels treat matrices slightly differently based on the platform. Nevertheless, all of them treat
+the matrices as a flattened strings in memory which lengths are known beforehand (total number of matrix elements)
+and the element by element matrix operations are parallelised along this string. The accelerator/CPU has a certain
+amount of instruction streams/threads that it can compute in parallel. This block of
+instructions streams/threads is looped over all matrix elements until the entire string is covered.
+
 =========
 PyFR-Mako
 =========
