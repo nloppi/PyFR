@@ -410,7 +410,7 @@ added at the end of the rows to satisfy the alignment requirement of
 the BLAS library.
 
 Individual elements in the row major matrix referenced with a formula
-$(A,B,C,D) = ABLeaddim + BLeaddim + Cleadsubdim + D. Multiplication
+:math:`(A,B,C,D) = ABLeaddim + BLeaddim + Cleadsubdim + D`. Multiplication
 kernels essentially loop over this formulate using
 instruction stream blocks/threads to calculate a group of elements
 parallel. The padding for the last column can be neglected in the
@@ -609,16 +609,17 @@ that correspond to each other.
 
 Let us consider two matrices containing the divergence of conservative variables
 in all flux points for two element types. To generate a View matrices that holds only
-the boundary values for left-hand side $l$ and right-hand side $r$, first we need to get the
+the boundary values for left-hand side :math:`l` and right-hand side :math:`r`, first we need to get the
 permutation of the these nodes via :code:`_gen_perm(self, lhs, rhs)` method. The permutation
 is arbitrary and results in an optimal memory access pattern for the LHS of the interface.
 To call the View Matrix class we only need to pass the permutation together with the
-extent, e.g. 'get_scal_fpts_for_inter'. The underlying methodology for the extents is
-is that we pass as an arguments: :code:`matmap` a list of matrix ids(integers) that we want
+extent, e.g. 'get_scal_fpts_for_inter'. The underlying methodology for the extents that we
+pass as arguments: :code:`matmap` a list of matrix ids(e.g. [trianglesmat_id, quadsmat_id]) that we want
 to be viewed, :code:`rcmap` a list that contains row and column indices of the matrices,
 :code:`rcstride` a list that defines how many matrix elements we need
 jump forward and downward to get to get the next conservative variable and other dimension,
-respectively. The :code:`rcstride` list is essentially defined by the permutation.
+respectively. The two-dimensional :code:`rcstride` list ([[rstride], [cstrice]]) is
+essentially defined by the permutation.
 
 
 ..  tikz:: [scale=0.4]
@@ -639,13 +640,17 @@ respectively. The :code:`rcstride` list is essentially defined by the permutatio
   \draw[line width=1mm] (12.5, 0.5) -- (12.5, 10.5);
   \draw[line width=1mm] (0.5, 5.5) -- (19.5, 5.5);
   \draw[dashed, line width=0.6mm, dash pattern=on 5pt off 3pt] (17.5, 0.5) -- (17.5, 10.5);
-  \node[fill=white, minimum size=0.7cm] at (3,7.5) {};
-  \node at (3,7.5) {$\nabla \rho$};
-  \node[fill=white, minimum size=0.7cm] at (9,7.5) {};
-  \node at (9,7.5) {$\nabla \rho u$};
-  \node[fill=white, minimum size=0.7cm] at (15,7.5) {};
-  \node at (15,7.5) {$\nabla E$};
+  \node[fill=white, minimum size=0.7cm] at (3,9.5) {};
+  \node at (3,9.5) {$\nabla \rho$};
+  \node[fill=white, minimum size=0.7cm] at (9,9.5) {};
+  \node at (9,9.5) {$\nabla \rho u$};
+  \node[fill=white, minimum size=0.7cm] at (15,9.5) {};
+  \node at (15,9.5) {$\nabla E$};
   \node[right] at (23,5.5) {Matrix1: Triangles};
+  \node[fill=white] at (9,7) {\texttt{cstride}};
+  \node[fill=white] at (2.8,3) {\texttt{rstride}};
+  \draw[->, line width=0.4mm ] (5,6) -- (11,6);
+  \draw[->, line width=0.4mm ] (5,6) -- (5,1);
 
 
 ..  tikz:: [scale=0.4]
@@ -666,12 +671,12 @@ respectively. The :code:`rcstride` list is essentially defined by the permutatio
   \draw[line width=1mm] (12.5, 0.5) -- (12.5, 10.5);
   \draw[line width=1mm] (0.5, 5.5) -- (19.5, 5.5);
   \draw[dashed, line width=0.6mm, dash pattern=on 5pt off 3pt] (17.5, 0.5) -- (17.5, 10.5);
-  \node[fill=white, minimum size=0.7cm] at (3,7.5) {};
-  \node at (3,7.5) {$\nabla \rho$};
-  \node[fill=white, minimum size=0.7cm] at (9,7.5) {};
-  \node at (9,7.5) {$\nabla \rho u$};
-  \node[fill=white, minimum size=0.7cm] at (15,7.5) {};
-  \node at (15,7.5) {$\nabla E$};
+  \node[fill=white, minimum size=0.7cm] at (3,9.5) {};
+  \node at (3,9.5) {$\nabla \rho$};
+  \node[fill=white, minimum size=0.7cm] at (9,9.5) {};
+  \node at (9,9.5) {$\nabla \rho u$};
+  \node[fill=white, minimum size=0.7cm] at (15,9.5) {};
+  \node at (15,9.5) {$\nabla E$};
   \node[right] at (23,5.5) {Matrix1: Quadrilaterals};
 
 
