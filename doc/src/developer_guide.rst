@@ -353,68 +353,368 @@ Types of `Kernel Generator`_ are related via the following inheritance diagram:
                          pyfr.backends.openmp.generator.OpenMPKernelGenerator
     :parts: 1
 
-Data Structure
-----------------
+=========
+PyFR Data Stucture
+=========
 
-PyFR stores datasets using backend specific :code:`Matrix` and :code:`MatrixBank` objects. :code:`Matrix` objects
-are individual matrices while the :code:`MatrixBank` objects function as set of matrices having
-the same shape and which can be activated individually. The data storage methodology is essentially
-defined by initialising `Backend`_ in the :code:`main.py`. However, the number of matrices,
-their shapes and contents depend on the used `System`_ and `Stepper`_. The Integrator composite
-class fetches the number of required MatrixBanks :code:`nreg = self._stepper_nregs` from `Stepper`_
-and passes it as an argument together with the :code:`backend` and :code:`mesh` objects for the `System`_ class,
-:code:`systemcls = Systemcls(backend, ... ,mesh, .., nreg)`. When the `System`_ object is initialised a
-method :code:`_load_eles(..., mesh, ..., nreg)` is called, which creates a proxylist that contains
-an `Elements`_ class object for each element type in the mesh. The when element objects are
-initialised they gather the essential information to define the matrices, such as number of solution points,
-dimensions, variables and the numbers of elements from the mesh and basis objects. After, all element
-objects collectively evoke the :code:`_set_backend(backend, nregs)` method that allocates scratch spaces for
-required matrices at the backend, producing the backend specific :code:`Matrix`  and :code:`MatrixBank` objects.
-Additionally, :code:`abus` list is used to keep track of the memory allocation on the CPU side.
-This allows us to exploit already allocated memory to store temporary solution matrices outside
-of the div F calculation.
+Matrices
+--------
 
-In the :code:`backend.MatrixBase`, all matrices are reduced into two dimension where the number of rows is
-the number of solution points, :code:`nupts`, for originally 3D arrays and :code:`ndims*nupts`
-for 4D arrays. The number of columns are :code:`nvars*neles` in both cases. However, padding is added to the
-columns to adjust their lengths to be divisible with the memory alignment requirement :code:`alignb`. The padding at
-the end of the rows (for the last :code:`nvar`) can be neglected in the matrix operations and thus it is not
-considered in the total column count :code:`ncol = shape[-2]*shape[-1] + (1 - shape[-2])*(shape[-1] % -ldmod)`.
-However, the last dimension still needs to be padded in the memory and its taken into account
-in the total padding :code:`shape[-1] -= shape[-1] % -ldmod`. The figure below illustrates the :code:`backend.Matrix`
-structure for a 3D matrix.
+Matrices in PyFR are handled with a backend specific
+:class:`~pyfr.backends.base.types.Matrix` objects. The memory allocation for
+matrices is done by `System`_ that gathers the necessary information to shape
+the matrix, such as number of elements, solution points and variables.
+Regardless of the dimensionality of the matrix,
+:class:`~pyfr.backends.base.types.Matrix` class treats them
+as two-dimensional, using a representation illustrated below for a
+4-dimensional matrix with a shape
+:code:`self.shape = (ndims=2, nupts, nvars=3, neles)`.
 
 ..  tikz:: [scale=0.6]
-  \draw[shift={(0.5,0.5)}] (0,0) grid (18,9);
-  \node at (9,10) {$\text{nvars} \cdot \text{neles}$};
-  \node[left] at (0,5) {$\text{nupts}$};
+  \draw[shift={(0.5,0.5)}] (0,0) grid (19,10);
   \foreach \x in {6} {
-  \foreach \y in {1,2,3,4,5,6,7,8,9} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
   \node[fill=gray] at (\x,\y) {};;}}
   \foreach \x in {12} {
-  \foreach \y in {1,2,3,4,5,6,7,8,9} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
   \node[fill=gray] at (\x,\y) {};;}}
   \foreach \x in {18} {
-  \foreach \y in {1,2,3,4,5,6,7,8,9} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
   \node[fill=gray] at (\x,\y) {};;}}
+  \foreach \x in {19} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
+  \node[fill=green] at (\x,\y) {};;}}
   \node at (3,-0.15) {$\text{leadsubdim}$};
-  \draw[->] (0.5,-0.5) -- (6.5,-0.5);
+  \draw[<->] (0.5,-0.5) -- (6.5,-0.5);
   \node at (9,-0.95) {$\text{leaddim}$};
-  \draw[->] (0.5,-1.3) -- (18.5,-1.3);
-  \draw[line width=1mm] (6.5, 0.5) -- (6.5, 9.5);
-  \draw[line width=1mm] (12.5, 0.5) -- (12.5, 9.5);
-  \draw[dashed, line width=0.6mm, dash pattern=on 5pt off 3pt] (17.5, 0.5) -- (17.5, 9.5);
+  \draw[<->] (0.5,-1.3) -- (19.5,-1.3);
+  \draw[line width=1mm] (6.5, 0.5) -- (6.5, 10.5);
+  \draw[line width=1mm] (12.5, 0.5) -- (12.5, 10.5);
+  \draw[line width=1mm] (0.5, 5.5) -- (19.5, 5.5);
+  \draw[dashed, line width=0.6mm, dash pattern=on 5pt off 3pt] (17.5, 0.5) -- (17.5, 10.5);
   \draw[-] (6,-0.1) -- (18,-0.1);
   \draw[->] (18,-0.1) -- (18,0.3);
   \draw[->] (6,-0.1) -- (6,0.3);
   \draw[->] (12,-0.1) -- (12,0.3);
   \node at (12,-0.5) {$\text{padding}$};
+  \draw[<->] (0.5, 10.8) -- (5.5, 10.8);
+  \node at (3,11.2) {$\text{neles}$};
+  \draw[<->] (0.1, 10.5) -- (0.1, 5.5);
+  \node at (-1,8) {$\text{nupts}$};
+  \draw[->] (19,11.2) -- (19,10.7);
+  \node at (18,11.5) {$\text{BLAS padding}$};
 
-The low-level kernels treat matrices slightly differently depending on the platform. Nevertheless, all of them consider
-the matrices as a flattened strings in memory which lengths are known beforehand (total number of matrix elements)
-and the element by element matrix operations are parallelised along this string. The accelerator/CPU has a certain
-amount of instruction streams/threads that it can compute in parallel. This block of
-instructions streams/threads is looped over all matrix elements until the entire string is covered.
+Padding is added to the columns to adjust their lengths to be
+divisible with the memory alignment requirement. Additional padding can
+added at the end of the rows to satisfy the alignment requirement of
+the BLAS library.
+
+Individual elements in the row major matrix referenced with a formula
+$(A,B,C,D) = ABLeaddim + BLeaddim + Cleadsubdim + D. Multiplication
+kernels essentially loop over this formulate using
+instruction stream blocks/threads to calculate a group of elements
+parallel. The padding for the last column can be neglected in the
+matrix operations as they exist only to fulfill the memory alignment
+requirement and do not contain data that needs to be operated.
+
+.. autoclass:: pyfr.backends.base.types.MatrixBase
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+
+.. autoclass:: pyfr.backends.cuda.types.CUDAMatrixBase
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+.. autoclass:: pyfr.backends.opencl.types.OpenCLMatrixBase
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+
+.. autoclass:: pyfr.backends.openmp.types.OpenMPMatrixBase
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+.. autoclass:: pyfr.backends.base.types.Matrix
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+
+.. autoclass:: pyfr.backends.cuda.types.CUDAMatrix
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+.. autoclass:: pyfr.backends.opencl.types.OpenCLMatrix
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+
+.. autoclass:: pyfr.backends.openmp.types.OpenMPMatrix
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+.. inheritance-diagram:: pyfr.backends.base.types.MatrixBase
+                         pyfr.backends.cuda.types.CUDAMatrixBase
+                         pyfr.backends.opencl.types.OpenCLMatrixBase
+                         pyfr.backends.openmp.types.OpenMPMatrixBase
+                         pyfr.backends.base.types.Matrix
+                         pyfr.backends.cuda.types.CUDAMatrix
+                         pyfr.backends.opencl.types.OpenCLMatrix
+                         pyfr.backends.openmp.types.OpenMPMatrix
+
+    :parts: 1
+
+.. inheritance-diagram:: pyfr.backends.base.types.Matrix
+
+    :parts: 1
+
+
+
+Matrix Banks
+------------
+
+:class:`~pyfr.backends.base.types.MatrixBank` objects are a combination of
+several matrices having the same shape. Matrices in a
+:class:`~pyfr.backends.base.types.MatrixBank` have an allocated index
+that points to a register containing the Matrix. Individual
+matrices in :class:`~pyfr.backends.base.types.MatrixBank` can be operated
+by making them active when the MatrixBank essentially represents
+a single Matrix. A schematic figure below illustrates the
+structure of a :class:`~pyfr.backends.base.types.MatrixBank`
+
+..  tikz:: [scale=1.0]
+  \draw[shift={(0.5,0.5)}] (0,0) grid (4,1);
+  \node at (1,1) {$[A]$};
+  \node at (2,1) {$[B]$};
+  \node at (3,1) {$[C]$};
+  \node at (4,1) {$[D]$};
+  \node at (0.1,2) {$regidx=[0$};
+  \node at (2,2) {$1$};
+  \node at (3,2) {$2$};
+  \node at (4,2) {$3]$};
+
+
+..  tikz:: [scale=1.0]
+  \draw[shift={(0.5,0.5)}] (0,0) grid (4,1);
+  \node[fill=green, minimum size=0.5cm] at (3,1) {};
+  \node at (1,1) {$[A]$};
+  \node at (2,1) {$[B]$};
+  \node at (3,1) {$[C]$};
+  \node at (4,1) {$[D]$};
+  \node at (0.1,2) {\texttt{MatrixBank.active = 2}};
+  \node at (1,0) {$\texttt{NewMatrix} = \texttt{MatrixBank} \times 3 = 3[C]$};
+
+..  tikz:: [scale=1.0]
+  \draw[shift={(0.5,0.5)}] (0,0) grid (4,1);
+  \node[fill=green, minimum size=0.5cm] at (1,1) {};
+  \node at (1,1) {$[A]$};
+  \node at (2,1) {$[B]$};
+  \node at (3,1) {$[C]$};
+  \node at (4,1) {$[D]$};
+  \node at (0.1,2) {\texttt{MatrixBank.active = 0}};
+  \node at (2.3,0) {$\texttt{AnotherMatrix} = \texttt{MatrixBank} + \texttt{MatrixBank} = 2[A]$};
+
+
+.. autoclass:: pyfr.backends.base.types.MatrixBank
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+
+.. autoclass:: pyfr.backends.cuda.types.CUDAMatrixBank
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+.. autoclass:: pyfr.backends.opencl.types.OpenCLMatrixBank
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+
+.. autoclass:: pyfr.backends.openmp.types.OpenMPMatrixBank
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+.. inheritance-diagram:: pyfr.backends.base.types.MatrixBank
+
+    :parts: 1
+
+
+Views
+------------
+
+PyFR uses Riemann solvers to calculate common interface fluxes that are needed
+Information on both sides of the interface is needed and View class
+is used to keep track and pair the numerical flux interface points
+that correspond to each other.
+
+..  tikz:: [scale=0.7]
+  \draw (0,4) -- (4,4) -- (2,6) -- (0,4);
+  \draw (0,0) -- (4,0) -- (4,4) -- (0,4) -- (0,0);
+  \filldraw (2,3.85) circle (1.5pt);
+  \filldraw (0.4,3.85) circle (1.5pt);
+  \filldraw (3.6,3.85) circle (1.5pt);
+  \filldraw (2,4.15) circle (1.5pt);
+  \filldraw (0.4,4.15) circle (1.5pt);
+  \filldraw (3.6,4.15) circle (1.5pt);
+  \draw (1.8,3.7) -- (2.2,3.7) -- (2.2,4.3) -- (1.8,4.3) -- (1.8,3.7);
+  \node at (2,3.4) {$l$};
+  \node at (2,4.5) {$r$};
+
+Let us consider two matrices containing the divergence of conservative variables
+in all flux points for two element types. To generate a View matrices that holds only
+the boundary values for left-hand side $l$ and right-hand side $r$, first we need to get the
+permutation of the these nodes via :code:`_gen_perm(self, lhs, rhs)` method. The permutation
+is arbitrary and results in an optimal memory access pattern for the LHS of the interface.
+To call the View Matrix class we only need to pass the permutation together with the
+extent, e.g. 'get_scal_fpts_for_inter'. The underlying methodology for the extents is
+is that we pass as an arguments: :code:`matmap` a list of matrix ids(integers) that we want
+to be viewed, :code:`rcmap` a list that contains row and column indices of the matrices,
+:code:`rcstride` a list that defines how many matrix elements we need
+jump forward and downward to get to get the next conservative variable and other dimension,
+respectively. The :code:`rcstride` list is essentially defined by the permutation.
+
+
+..  tikz:: [scale=0.4]
+  \draw[shift={(0.5,0.5)}] (0,0) grid (19,10);
+  \foreach \x in {6} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
+  \node[fill=gray] at (\x,\y) {};;}}
+  \foreach \x in {12} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
+  \node[fill=gray] at (\x,\y) {};;}}
+  \foreach \x in {18} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
+  \node[fill=gray] at (\x,\y) {};;}}
+  \foreach \x in {19} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
+  \node[fill=green] at (\x,\y) {};;}}
+  \draw[line width=1mm] (6.5, 0.5) -- (6.5, 10.5);
+  \draw[line width=1mm] (12.5, 0.5) -- (12.5, 10.5);
+  \draw[line width=1mm] (0.5, 5.5) -- (19.5, 5.5);
+  \draw[dashed, line width=0.6mm, dash pattern=on 5pt off 3pt] (17.5, 0.5) -- (17.5, 10.5);
+  \node[fill=white, minimum size=0.7cm] at (3,7.5) {};
+  \node at (3,7.5) {$\nabla \rho$};
+  \node[fill=white, minimum size=0.7cm] at (9,7.5) {};
+  \node at (9,7.5) {$\nabla \rho u$};
+  \node[fill=white, minimum size=0.7cm] at (15,7.5) {};
+  \node at (15,7.5) {$\nabla E$};
+  \node[right] at (23,5.5) {Matrix1: Triangles};
+
+
+..  tikz:: [scale=0.4]
+  \draw[shift={(0.5,0.5)}] (0,0) grid (19,10);
+  \foreach \x in {6} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
+  \node[fill=gray] at (\x,\y) {};;}}
+  \foreach \x in {12} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
+  \node[fill=gray] at (\x,\y) {};;}}
+  \foreach \x in {18} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
+  \node[fill=gray] at (\x,\y) {};;}}
+  \foreach \x in {19} {
+  \foreach \y in {1,2,3,4,5,6,7,8,9,10} {
+  \node[fill=green] at (\x,\y) {};;}}
+  \draw[line width=1mm] (6.5, 0.5) -- (6.5, 10.5);
+  \draw[line width=1mm] (12.5, 0.5) -- (12.5, 10.5);
+  \draw[line width=1mm] (0.5, 5.5) -- (19.5, 5.5);
+  \draw[dashed, line width=0.6mm, dash pattern=on 5pt off 3pt] (17.5, 0.5) -- (17.5, 10.5);
+  \node[fill=white, minimum size=0.7cm] at (3,7.5) {};
+  \node at (3,7.5) {$\nabla \rho$};
+  \node[fill=white, minimum size=0.7cm] at (9,7.5) {};
+  \node at (9,7.5) {$\nabla \rho u$};
+  \node[fill=white, minimum size=0.7cm] at (15,7.5) {};
+  \node at (15,7.5) {$\nabla E$};
+  \node[right] at (23,5.5) {Matrix1: Quadrilaterals};
+
+
+.. autoclass:: pyfr.backends.base.types.View
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+.. autoclass:: pyfr.backends.cuda.types.CUDAView
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+.. autoclass:: pyfr.backends.opencl.types.OpenCLView
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+
+.. autoclass:: pyfr.backends.openmp.types.OpenMPView
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+
+.. inheritance-diagram:: pyfr.backends.base.types.View
+
+    :parts: 1
+
+
+
 
 =========
 PyFR-Mako
