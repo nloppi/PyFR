@@ -354,7 +354,7 @@ Types of `Kernel Generator`_ are related via the following inheritance diagram:
     :parts: 1
 
 =========
-PyFR Data Stucture
+Data Stucture
 =========
 
 Matrices
@@ -404,17 +404,17 @@ as two-dimensional, using a representation illustrated below for a
   \draw[->] (19,11.2) -- (19,10.7);
   \node at (18,11.5) {$\text{BLAS padding}$};
 
-Padding is added to the columns to adjust their lengths to be
+Padding is added to the subdimensions to adjust their lengths to be
 divisible with the memory alignment requirement. Additional padding can
-added at the end of the rows to satisfy the alignment requirement of
-the BLAS library.
+added at the end of the leaddimension to satisfy the alignment requirement of
+some BLAS library methods.
 
-Individual elements in the row major matrix referenced with a formula
-:math:`(A,B,C,D) = ABLeaddim + BLeaddim + Cleadsubdim + D`. Multiplication
-kernels essentially loop over this formulate using
-instruction stream blocks/threads to calculate a group of elements
+Individual elements in the row major matrix are referenced with a formula
+:math:`f(A,B,C,D) = A \cdot B \cdot leaddim + B \cdot leaddim + C \cdot leadsubdim + D`. Multiplication
+kernels essentially loop over this formula using
+instruction stream blocks/threads to calculate a group of elements in
 parallel. The padding for the last column can be neglected in the
-matrix operations as they exist only to fulfill the memory alignment
+matrix operations as it exist only to fulfill the memory alignment
 requirement and do not contain data that needs to be operated.
 
 .. autoclass:: pyfr.backends.base.types.MatrixBase
@@ -493,11 +493,6 @@ requirement and do not contain data that needs to be operated.
                          pyfr.backends.cuda.types.CUDAMatrix
                          pyfr.backends.opencl.types.OpenCLMatrix
                          pyfr.backends.openmp.types.OpenMPMatrix
-
-    :parts: 1
-
-.. inheritance-diagram:: pyfr.backends.base.types.Matrix
-
     :parts: 1
 
 
@@ -510,9 +505,9 @@ several matrices having the same shape. Matrices in a
 :class:`~pyfr.backends.base.types.MatrixBank` have an allocated index
 that points to a register containing the Matrix. Individual
 matrices in :class:`~pyfr.backends.base.types.MatrixBank` can be operated
-by making them active when the MatrixBank essentially represents
+by making them active, when the MatrixBank essentially represents
 a single Matrix. A schematic figure below illustrates the
-structure of a :class:`~pyfr.backends.base.types.MatrixBank`
+structure and usage of a :class:`~pyfr.backends.base.types.MatrixBank`
 
 ..  tikz:: [scale=1.0]
   \draw[shift={(0.5,0.5)}] (0,0) grid (4,1);
@@ -581,15 +576,16 @@ structure of a :class:`~pyfr.backends.base.types.MatrixBank`
     :exclude-members: _abc_cache, _abc_negative_cache,
                       _abc_negative_cache_version, _abc_registry
 
-.. inheritance-diagram:: pyfr.backends.base.types.MatrixBank
-
+.. inheritance-diagram:: pyfr.backends.cuda.types.CUDAMatrixBank
+                         pyfr.backends.opencl.types.OpenCLMatrixBank
+                         pyfr.backends.openmp.types.OpenMPMatrixBank
     :parts: 1
 
 
 Views
 ------------
 
-PyFR uses Riemann solvers to calculate common interface fluxes that are needed
+PyFR uses Riemann solvers to calculate common interface for flux correction.
 Information on both sides of the interface is needed and View class
 is used to keep track and pair the numerical flux interface points
 that correspond to each other.
@@ -604,22 +600,32 @@ that correspond to each other.
   \filldraw (0.4,4.15) circle (1.5pt);
   \filldraw (3.6,4.15) circle (1.5pt);
   \draw (1.8,3.7) -- (2.2,3.7) -- (2.2,4.3) -- (1.8,4.3) -- (1.8,3.7);
-  \node at (2,3.4) {$l$};
-  \node at (2,4.5) {$r$};
+  \node at (2,3.3) {$lhs$};
+  \node at (2,4.6) {$rhs$};
 
 Let us consider two matrices containing the divergence of conservative variables
 in all flux points for two element types. To generate a View matrices that holds only
-the boundary values for left-hand side :math:`l` and right-hand side :math:`r`, first we need to get the
-permutation of the these nodes via :code:`_gen_perm(self, lhs, rhs)` method. The permutation
-is arbitrary and results in an optimal memory access pattern for the LHS of the interface.
-To call the View Matrix class we only need to pass the permutation together with the
-extent, e.g. 'get_scal_fpts_for_inter'. The underlying methodology for the extents that we
-pass as arguments: :code:`matmap` a list of matrix ids(e.g. [trianglesmat_id, quadsmat_id]) that we want
-to be viewed, :code:`rcmap` a list that contains row and column indices of the matrices,
-:code:`rcstride` a list that defines how many matrix elements we need
-jump forward and downward to get to get the next conservative variable and other dimension,
-respectively. The two-dimensional :code:`rcstride` list ([[rstride], [cstrice]]) is
-essentially defined by the permutation.
+the boundary values for left-hand side :math:`lhs` and right-hand side :math:`rhs`, first we need to get the
+view permutation of the these nodes. The permutation
+is arbitrary and results in an optimal memory access pattern for the :math:`LHS` of the interface.
+To generate the View Matrix, we simply need to pass the permutation together with the
+extent, for example::
+
+            self._gen_perm(lhs, rhs)
+            self._scal0_lhs = self._scal_view(lhs, 'get_scal_fpts_for_inter')
+            self._scal0_rhs = self._scal_view(rhs, 'get_scal_fpts_for_inter')
+
+The underlying methodology behind the extent, is passing several individual arguments
+for the :class:`~pyfr.backends.base.types.View` class initialisation:
+
+ * :code:`matmap` - A list of matrix ids(e.g. :code:`[trianglesmat_id, quadsmat_id]`) that we want
+   to be viewed
+ * :code:`rcmap`  - A list that contains row and column indices of the matrices
+ * :code:`rcstride` (:code:`[[rstride], [cstrice]]`) - A list that defines how many
+   matrix elements we need jump forward and downward to get to the next conservative
+   variable and other dimension, respectively.
+ * :code:`vshape` shape of the matrices for book keeping
+ * :code:`tags` Matrix tags for book keeping
 
 
 ..  tikz:: [scale=0.4]
@@ -714,11 +720,10 @@ essentially defined by the permutation.
                       _abc_negative_cache_version, _abc_registry
 
 
-.. inheritance-diagram:: pyfr.backends.base.types.View
-
+.. inheritance-diagram:: pyfr.backends.cuda.types.CUDAView
+                         pyfr.backends.opencl.types.OpenCLView
+                         pyfr.backends.openmp.types.OpenMPView
     :parts: 1
-
-
 
 
 =========
