@@ -3,7 +3,7 @@
 from pyfr.solvers.baseadvec import BaseAdvectionElements
 
 
-class BaseFluidElements(object):
+class BaseACFluidElements(object):
     formulations = ['std', 'dual']
 
     privarmap = {2: ['p', 'u', 'v'],
@@ -31,7 +31,7 @@ class BaseFluidElements(object):
         return convs
 
 
-class ACEulerElements(BaseFluidElements, BaseAdvectionElements):
+class ACEulerElements(BaseACFluidElements, BaseAdvectionElements):
     def set_backend(self, backend, nscalupts):
         super().set_backend(backend, nscalupts)
 

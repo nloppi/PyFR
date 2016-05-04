@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from pyfr.solvers.baseadvecdiff import BaseAdvectionDiffusionSystem
 from pyfr.solvers.acnavstokes.elements import ACNavierStokesElements
 from pyfr.solvers.acnavstokes.inters import (ACNavierStokesBaseBCInters,
-                                           ACNavierStokesIntInters,
-                                           ACNavierStokesMPIInters)
+                                             ACNavierStokesIntInters,
+                                             ACNavierStokesMPIInters)
+from pyfr.solvers.baseadvecdiff import BaseAdvectionDiffusionSystem
 
 
 class ACNavierStokesSystem(BaseAdvectionDiffusionSystem):
@@ -67,4 +67,3 @@ class ACNavierStokesSystem(BaseAdvectionDiffusionSystem):
         else:
             q1 << kernels['eles', 'negdivconf'](t=t)
         runall([q1])
-

@@ -24,4 +24,3 @@ class ACNavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 u=self.scal_upts_inb, smats=self.smat_at('upts'),
                 f=self._vect_upts
             )
-

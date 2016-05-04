@@ -67,6 +67,7 @@ class ACEulerInflowBCInters(ACEulerBaseBCInters):
 
         self._tpl_c.update(tplc)
 
+
 class ACEulerOutflowBCInters(ACEulerBaseBCInters):
     type = 'ac-out-fp'
 
@@ -78,6 +79,7 @@ class ACEulerOutflowBCInters(ACEulerBaseBCInters):
         )
 
         self._tpl_c.update(tplc)
+
 
 class ACEulerSlpWallBCInters(ACEulerBaseBCInters):
     type = 'slp-wall'

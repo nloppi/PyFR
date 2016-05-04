@@ -63,9 +63,9 @@ class ACNavierStokesBaseBCInters(BaseAdvectionDiffusionBCInters):
 
         # Pointwise template arguments
         rsolver = self.cfg.get('solver-interfaces', 'riemann-solver')
-        tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver, c=self._tpl_c,
-                       bctype=self.type, bccfluxstate=self.cflux_state)
-
+        tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver,
+                       c=self._tpl_c, bctype=self.type,
+                       bccfluxstate=self.cflux_state)
 
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.bcconu')
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.bccflux')
@@ -92,9 +92,11 @@ class ACNavierStokesNoSlptWallBCInters(ACNavierStokesBaseBCInters):
 
         self._tpl_c['v'] = self._eval_opts('uvw'[:self.ndims], default='0')
 
+
 class ACNavierStokesSlpWallBCInters(ACNavierStokesBaseBCInters):
     type = 'slp-wall'
     cflux_state = None
+
 
 class ACNavierStokesInflowBCInters(ACNavierStokesBaseBCInters):
     type = 'ac-in-fv'
@@ -109,6 +111,7 @@ class ACNavierStokesInflowBCInters(ACNavierStokesBaseBCInters):
 
         self._tpl_c.update(tplc)
 
+
 class ACNavierStokesOutflowBCInters(ACNavierStokesBaseBCInters):
     type = 'ac-out-fp'
     cflux_state = 'ghost'
@@ -121,4 +124,3 @@ class ACNavierStokesOutflowBCInters(ACNavierStokesBaseBCInters):
         )
 
         self._tpl_c.update(tplc)
-

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from pyfr.solvers.baseadvec import BaseAdvectionSystem
 from pyfr.solvers.aceuler.elements import ACEulerElements
 from pyfr.solvers.aceuler.inters import (ACEulerIntInters, ACEulerMPIInters,
-                                       ACEulerBaseBCInters)
+                                         ACEulerBaseBCInters)
+from pyfr.solvers.baseadvec import BaseAdvectionSystem
 
 
 class ACEulerSystem(BaseAdvectionSystem):

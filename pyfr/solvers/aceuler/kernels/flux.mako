@@ -3,8 +3,7 @@
 
 <%pyfr:macro name='inviscid_flux' params='s, f'>
     fpdtype_t v[${ndims}];
-
-    // Velocities directly in conservative variable array indices 1-3
+    // Velocities in the first indices of the conservative variable array
 % for i in range(ndims):
    v[${i}] = s[${i + 1}];
 % endfor

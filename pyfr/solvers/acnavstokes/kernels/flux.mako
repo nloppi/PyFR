@@ -10,12 +10,10 @@
     fpdtype_t v_x = grad_uin[0][2];
     fpdtype_t v_y = grad_uin[1][2];
 
-    fpdtype_t nu_c = ${c['nu']};
-
     // Negated stress tensor elements
-    fpdtype_t t_xx = -2*nu_c*(u_x - ${1.0/3.0}*(u_x + v_y));
-    fpdtype_t t_yy = -2*nu_c*(v_y - ${1.0/3.0}*(u_x + v_y));
-    fpdtype_t t_xy = -nu_c*(v_x + u_y);
+    fpdtype_t t_xx = -2*${c['nu']}*(u_x - ${1.0/3.0}*(u_x + v_y));
+    fpdtype_t t_yy = -2*${c['nu']}*(v_y - ${1.0/3.0}*(u_x + v_y));
+    fpdtype_t t_xy = -${c['nu']}*(v_x + u_y);
 
     fout[0][1] += t_xx;     fout[1][1] += t_xy;
     fout[0][2] += t_xy;     fout[1][2] += t_yy;
@@ -39,9 +37,9 @@
     fpdtype_t nu_c = ${c['nu']};
 
     // Negated stress tensor elements
-    fpdtype_t t_xx = -2*nu_c*(u_x - ${1.0/3.0}*(u_x + v_y + w_z));
-    fpdtype_t t_yy = -2*nu_c*(v_y - ${1.0/3.0}*(u_x + v_y + w_z));
-    fpdtype_t t_zz = -2*nu_c*(w_z - ${1.0/3.0}*(u_x + v_y + w_z));
+    fpdtype_t t_xx = -2*${c['nu']}*(u_x - ${1.0/3.0}*(u_x + v_y + w_z));
+    fpdtype_t t_yy = -2*${c['nu']}*(v_y - ${1.0/3.0}*(u_x + v_y + w_z));
+    fpdtype_t t_zz = -2*${c['nu']}*(w_z - ${1.0/3.0}*(u_x + v_y + w_z));
     fpdtype_t t_xy = -nu_c*(v_x + u_y);
     fpdtype_t t_xz = -nu_c*(u_z + w_x);
     fpdtype_t t_yz = -nu_c*(w_y + v_z);

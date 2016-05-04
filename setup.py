@@ -41,6 +41,13 @@ modules = [
     'pyfr.partitioners',
     'pyfr.scripts',
     'pyfr.solvers',
+    'pyfr.solvers.aceuler',
+    'pyfr.solvers.aceuler.kernels',
+    'pyfr.solvers.aceuler.kernels.bcs',
+    'pyfr.solvers.aceuler.kernels.rsolvers',
+    'pyfr.solvers.acnavstokes',
+    'pyfr.solvers.acnavstokes.kernels',
+    'pyfr.solvers.acnavstokes.kernels.bcs',
     'pyfr.solvers.base',
     'pyfr.solvers.baseadvec',
     'pyfr.solvers.baseadvec.kernels',
@@ -53,13 +60,6 @@ modules = [
     'pyfr.solvers.navstokes',
     'pyfr.solvers.navstokes.kernels',
     'pyfr.solvers.navstokes.kernels.bcs',
-    'pyfr.solvers.aceuler',
-    'pyfr.solvers.aceuler.kernels',
-    'pyfr.solvers.aceuler.kernels.bcs',
-    'pyfr.solvers.aceuler.kernels.rsolvers',
-    'pyfr.solvers.acnavstokes',
-    'pyfr.solvers.acnavstokes.kernels',
-    'pyfr.solvers.acnavstokes.kernels.bcs',
     'pyfr.writers'
 ]
 
@@ -83,6 +83,11 @@ package_data = {
         'tet/*.txt',
         'tri/*.txt'
     ],
+    'pyfr.solvers.aceuler.kernels': ['*.mako'],
+    'pyfr.solvers.aceuler.kernels.bcs': ['*.mako'],
+    'pyfr.solvers.aceuler.kernels.rsolvers': ['*.mako'],
+    'pyfr.solvers.acnavstokes.kernels': ['*.mako'],
+    'pyfr.solvers.acnavstokes.kernels.bcs': ['*.mako'],
     'pyfr.solvers.baseadvec.kernels': ['*.mako'],
     'pyfr.solvers.baseadvecdiff.kernels': ['*.mako'],
     'pyfr.solvers.euler.kernels': ['*.mako'],
@@ -90,11 +95,6 @@ package_data = {
     'pyfr.solvers.euler.kernels.rsolvers': ['*.mako'],
     'pyfr.solvers.navstokes.kernels': ['*.mako'],
     'pyfr.solvers.navstokes.kernels.bcs': ['*.mako'],
-    'pyfr.solvers.aceuler.kernels': ['*.mako'],
-    'pyfr.solvers.aceuler.kernels.bcs': ['*.mako'],
-    'pyfr.solvers.aceuler.kernels.rsolvers': ['*.mako'],
-    'pyfr.solvers.acnavstokes.kernels': ['*.mako'],
-    'pyfr.solvers.acnavstokes.kernels.bcs': ['*.mako'],
     'pyfr.tests': ['*.npz']
 }
 
