@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
+from pyfr.solvers.aceuler.elements import BaseACFluidElements
 from pyfr.solvers.baseadvecdiff import BaseAdvectionDiffusionElements
-from pyfr.solvers.aceuler.elements import BaseFluidElements
 
 
-class ACNavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
+class ACNavierStokesElements(BaseACFluidElements, BaseAdvectionDiffusionElements):
     def set_backend(self, backend, nscalupts):
         super().set_backend(backend, nscalupts)
         backend.pointwise.register('pyfr.solvers.acnavstokes.kernels.tflux')

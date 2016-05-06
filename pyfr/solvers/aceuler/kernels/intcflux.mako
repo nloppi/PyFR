@@ -19,4 +19,3 @@
     ur[${i}] = -magnl*fn[${i}];
 % endfor
 </%pyfr:kernel>
-

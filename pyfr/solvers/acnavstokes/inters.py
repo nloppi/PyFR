@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
-
-from pyfr.backends.base import NullComputeKernel, NullMPIKernel
 from pyfr.solvers.baseadvecdiff import (BaseAdvectionDiffusionBCInters,
                                         BaseAdvectionDiffusionIntInters,
                                         BaseAdvectionDiffusionMPIInters)
