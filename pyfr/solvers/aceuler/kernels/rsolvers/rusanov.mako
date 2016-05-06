@@ -18,11 +18,8 @@
     // Normal of the average interface velocity
     fpdtype_t nv = 0.5*${pyfr.dot('n[{i}]', 'vl[{i}] + vr[{i}]', i=ndims)};
 
-    // Estimate the maximum wave speed
-    fpdtype_t a_1 = fabs(nv - sqrt(nv*nv+${c['ac-zeta']}));
-    fpdtype_t a_2 = fabs(nv + sqrt(nv*nv+${c['ac-zeta']}));
-    fpdtype_t a_3 = fabs(nv);
-    fpdtype_t a = max(max(a_1, a_2), a_3);
+    // Estimate the wave speed
+    fpdtype_t a = fabs(nv) + sqrt(nv*nv+${c['ac-zeta']});
 
     // Output
 % for i in range(nvars):
