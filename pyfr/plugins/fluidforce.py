@@ -19,7 +19,10 @@ class BaseFluidForcePlugin(BasePlugin):
         self.nsteps = self.cfg.getint(cfgsect, 'nsteps')
 
         # Check if we need to compute viscous force
-        self._viscous = ('navier-stokes' in intg.system.name)
+        self._viscous = 'navier-stokes' in intg.system.name
+
+        # Index containing pressure
+        self.pidx = -1
 
         # Viscous correction
         self._viscorr = self.cfg.get('solver', 'viscosity-correction', 'none')
@@ -102,12 +105,7 @@ class BaseFluidForcePlugin(BasePlugin):
                 self._rcpjact = {k: rcpjact[k[0]][..., v]
                                  for k, v in self._eidxs.items()}
 
-
-class StdFluidForcePlugin(BaseFluidForcePlugin):
-    name = 'fluidforce'
-    systems = ['euler', 'navier-stokes']
-
-    def __call__(self, intg):
+    def run_plugin(self, intg):
         # Return if no output is due
         if intg.nacptsteps % self.nsteps:
             return
@@ -136,7 +134,7 @@ class StdFluidForcePlugin(BaseFluidForcePlugin):
             ufpts = ufpts.swapaxes(0, 1)
 
             # Compute the pressure
-            p = self.elementscls.con_to_pri(ufpts, self.cfg)[-1]
+            p = self.elementscls.con_to_pri(ufpts, self.cfg)[self.pidx]
 
             # Get the quadrature weights and normal vectors
             qwts = self._qwts[etype, fidx]
@@ -183,6 +181,14 @@ class StdFluidForcePlugin(BaseFluidForcePlugin):
             # Flush to disk
             self.outf.flush()
 
+
+class StdFluidForcePlugin(BaseFluidForcePlugin):
+    name = 'fluidforce'
+    systems = ['euler', 'navier-stokes']
+
+    def __call__(self, intg):
+        self.run_plugin(intg)
+
     def stress_tensor(self, u, du):
         c = self._constants
 
@@ -214,89 +220,15 @@ class ACFluidForcePlugin(BaseFluidForcePlugin):
     systems = ['ac-euler', 'ac-navier-stokes']
 
     def __call__(self, intg):
-        # Return if no output is due
-        if intg.nacptsteps % self.nsteps:
-            return
+        self.pidx = 0
+        self.run_plugin(intg)
 
-        # MPI info
-        comm, rank, root = get_comm_rank_root()
-
-        # Solution matrices indexed by element type
-        solns = dict(zip(intg.system.ele_types, intg.soln))
-        ndims, nvars = self.ndims, self.nvars
-
-        # Force vector
-        f = np.zeros(2*ndims if self._viscous else ndims)
-
-        for etype, fidx in self._m0:
-            # Get the interpolation operator
-            m0 = self._m0[etype, fidx]
-            nfpts, nupts = m0.shape
-
-            # Extract the relevant elements from the solution
-            uupts = solns[etype][..., self._eidxs[etype, fidx]]
-
-            # Interpolate to the face
-            ufpts = np.dot(m0, uupts.reshape(nupts, -1))
-            ufpts = ufpts.reshape(nfpts, nvars, -1)
-            ufpts = ufpts.swapaxes(0, 1)
-
-            # Compute the pressure
-            p = self.elementscls.con_to_pri(ufpts, self.cfg)[0]
-
-            # Get the quadrature weights and normal vectors
-            qwts = self._qwts[etype, fidx]
-            norms = self._norms[etype, fidx]
-
-            # Do the quadrature
-            f[:ndims] += np.einsum('i...,ij,jik', qwts, p, norms)
-
-            if self._viscous:
-                # Get operator and J^-T matrix
-                m4 = self._m4[etype]
-                rcpjact = self._rcpjact[etype, fidx]
-
-                # Transformed gradient at solution points
-                tduupts = np.dot(m4, uupts.reshape(nupts, -1))
-                tduupts = tduupts.reshape(ndims, nupts, nvars, -1)
-
-                # Physical gradient at solution points
-                duupts = np.einsum('ijkl,jkml->ikml', rcpjact, tduupts)
-                duupts = duupts.reshape(ndims, nupts, -1)
-
-                # Interpolate gradient to flux points
-                dufpts = np.array([np.dot(m0, du) for du in duupts])
-                dufpts = dufpts.reshape(ndims, nfpts, nvars, -1)
-                dufpts = dufpts.swapaxes(1, 2)
-
-                vis = self.stress_tensor(dufpts)
-
-                # Do the quadrature
-                f[ndims:] += np.einsum('i...,klij,jil', qwts, vis, norms)
-
-        # Reduce and output if we're the root rank
-        if rank != root:
-            comm.Reduce(f, None, op=get_mpi('sum'), root=root)
-        else:
-            comm.Reduce(get_mpi('in_place'), f, op=get_mpi('sum'), root=root)
-
-            # Build the row
-            row = [intg.tcurr] + f.tolist()
-
-            # Write
-            print(','.join(str(r) for r in row), file=self.outf)
-
-            # Flush to disk
-            self.outf.flush()
-
-    def stress_tensor(self, du):
-        c = self._constants
-
+    def stress_tensor(self, u, du):
         # Gradient of velocity
         gradu = du[:, 1:]
 
         # Bulk tensor
         bulk = np.eye(self.ndims)[:, :, None, None]*np.trace(gradu)
-        nu = c['nu']
+        nu = self._constants['nu']
 
         return -nu*(gradu + gradu.swapaxes(0, 1) - 2/3*bulk)

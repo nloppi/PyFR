@@ -11,15 +11,15 @@
     ${pyfr.expand('inviscid_flux', 'ur', 'fr')};
 
 % for i in range(ndims):
-   vl[${i}] = ul[${i + 1}];
-   vr[${i}] = ur[${i + 1}];
+    vl[${i}] = ul[${i + 1}];
+    vr[${i}] = ur[${i + 1}];
 % endfor
 
     // Normal of the average interface velocity
     fpdtype_t nv = 0.5*${pyfr.dot('n[{i}]', 'vl[{i}] + vr[{i}]', i=ndims)};
 
     // Estimate the wave speed
-    fpdtype_t a = fabs(nv) + sqrt(nv*nv+${c['ac-zeta']});
+    fpdtype_t a = fabs(nv) + sqrt(nv*nv + ${c['ac-zeta']});
 
     // Output
 % for i in range(nvars):

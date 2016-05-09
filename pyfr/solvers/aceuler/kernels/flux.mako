@@ -3,13 +3,14 @@
 
 <%pyfr:macro name='inviscid_flux' params='s, f'>
     fpdtype_t v[${ndims}];
+
     // Velocities in the first indices of the conservative variable array
 % for i in range(ndims):
-   v[${i}] = s[${i + 1}];
+    v[${i}] = s[${i + 1}];
 % endfor
 
     // Pressure in the conservative variable array index 0
-   fpdtype_t p = s[0];
+    fpdtype_t p = s[0];
 
     // Mass flux
 % for i in range(ndims):
