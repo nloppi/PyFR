@@ -2,13 +2,13 @@
 <%namespace module='pyfr.backends.base.makoutil' name='pyfr'/>
 
 <%pyfr:macro name='viscous_flux_add' params='uin, grad_uin, fout'>
+    fpdtype_t divu = ${' + '.join('grad_uin[{i}][{j}]'
+                                  .format(i=i,j=i+1)
+                                  for i in range(ndims))};
+
 % for i in range(ndims):
-    fout[${i}][${i + 1}] += ${-2.0*c['nu']}
-                            * (grad_uin[${i}][${i + 1}]
-                               - ${1.0/3.0}
-                               * (${' + '.join('grad_uin[{j}][{k}]'
-                                               .format(i=i, j=j, k=j+1)
-                                               for j in range(ndims))}));
+    fout[${i}][${i + 1}] += ${-2.0*c['nu']}*(grad_uin[${i}][${i + 1}]
+                                             - ${1.0/3.0}*divu);
 % endfor
 
 % for i in range(ndims - 1):
