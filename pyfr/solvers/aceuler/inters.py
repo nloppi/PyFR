@@ -64,7 +64,6 @@ class ACEulerInflowBCInters(ACEulerBaseBCInters):
         tplc, self._ploc = self._exp_opts(
             ['u', 'v', 'w'][:self.ndims], lhs
         )
-
         self._tpl_c.update(tplc)
 
 
@@ -77,7 +76,6 @@ class ACEulerOutflowBCInters(ACEulerBaseBCInters):
         tplc, self._ploc = self._exp_opts(
             ['p'], lhs
         )
-
         self._tpl_c.update(tplc)
 
 

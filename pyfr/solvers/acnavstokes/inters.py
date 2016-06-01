@@ -11,7 +11,8 @@ class ACNavierStokesIntInters(BaseAdvectionDiffusionIntInters):
 
         # Pointwise template arguments
         rsolver = self.cfg.get('solver-interfaces', 'riemann-solver')
-        tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver, c=self._tpl_c)
+        tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver,
+                       c=self._tpl_c)
 
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.intconu')
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.intcflux')
@@ -35,7 +36,8 @@ class ACNavierStokesMPIInters(BaseAdvectionDiffusionMPIInters):
 
         # Pointwise template arguments
         rsolver = self.cfg.get('solver-interfaces', 'riemann-solver')
-        tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver, c=self._tpl_c)
+        tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver,
+                       c=self._tpl_c)
 
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.mpiconu')
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.mpicflux')

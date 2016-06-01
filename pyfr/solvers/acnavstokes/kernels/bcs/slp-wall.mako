@@ -25,6 +25,6 @@
     ${pyfr.expand('rsolve', 'ul', 'ur', 'nl', 'ficomm')};
 
 % for i in range(nvars):
-    ul[${i}] = magnl*(ficomm[${i}]);
+    ul[${i}] = magnl*ficomm[${i}];
 % endfor
 </%pyfr:macro>
