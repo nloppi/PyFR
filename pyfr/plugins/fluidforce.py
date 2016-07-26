@@ -8,7 +8,9 @@ from pyfr.mpiutil import get_comm_rank_root, get_mpi
 from pyfr.plugins.base import BasePlugin, init_csv
 
 
-class BaseFluidForcePlugin(BasePlugin):
+class FluidForcePlugin(BasePlugin):
+    name = 'fluidforce'
+    systems = ['euler', 'navier-stokes']
 
     def __init__(self, intg, cfgsect, suffix):
         super().__init__(intg, cfgsect, suffix)
@@ -19,10 +21,7 @@ class BaseFluidForcePlugin(BasePlugin):
         self.nsteps = self.cfg.getint(cfgsect, 'nsteps')
 
         # Check if we need to compute viscous force
-        self._viscous = 'navier-stokes' in intg.system.name
-
-        # Index containing pressure
-        self.pidx = -1
+        self._viscous = intg.system.name == 'navier-stokes'
 
         # Viscous correction
         self._viscorr = self.cfg.get('solver', 'viscosity-correction', 'none')
@@ -105,7 +104,7 @@ class BaseFluidForcePlugin(BasePlugin):
                 self._rcpjact = {k: rcpjact[k[0]][..., v]
                                  for k, v in self._eidxs.items()}
 
-    def run_plugin(self, intg):
+    def __call__(self, intg):
         # Return if no output is due
         if intg.nacptsteps % self.nsteps:
             return
@@ -134,7 +133,7 @@ class BaseFluidForcePlugin(BasePlugin):
             ufpts = ufpts.swapaxes(0, 1)
 
             # Compute the pressure
-            p = self.elementscls.con_to_pri(ufpts, self.cfg)[self.pidx]
+            p = self.elementscls.con_to_pri(ufpts, self.cfg)[-1]
 
             # Get the quadrature weights and normal vectors
             qwts = self._qwts[etype, fidx]
@@ -161,6 +160,7 @@ class BaseFluidForcePlugin(BasePlugin):
                 dufpts = dufpts.reshape(ndims, nfpts, nvars, -1)
                 dufpts = dufpts.swapaxes(1, 2)
 
+                # Viscous stress
                 vis = self.stress_tensor(ufpts, dufpts)
 
                 # Do the quadrature
@@ -180,14 +180,6 @@ class BaseFluidForcePlugin(BasePlugin):
 
             # Flush to disk
             self.outf.flush()
-
-
-class StdFluidForcePlugin(BaseFluidForcePlugin):
-    name = 'fluidforce'
-    systems = ['euler', 'navier-stokes']
-
-    def __call__(self, intg):
-        self.run_plugin(intg)
 
     def stress_tensor(self, u, du):
         c = self._constants
@@ -213,22 +205,3 @@ class StdFluidForcePlugin(BaseFluidForcePlugin):
             mu *= (c['cpTref'] + c['cpTs'])*Trat**1.5 / (cpT + c['cpTs'])
 
         return -mu*(gradu + gradu.swapaxes(0, 1) - 2/3*bulk)
-
-
-class ACFluidForcePlugin(BaseFluidForcePlugin):
-    name = 'acfluidforce'
-    systems = ['ac-euler', 'ac-navier-stokes']
-
-    def __call__(self, intg):
-        self.pidx = 0
-        self.run_plugin(intg)
-
-    def stress_tensor(self, u, du):
-        # Gradient of velocity
-        gradu = du[:, 1:]
-
-        # Bulk tensor
-        bulk = np.eye(self.ndims)[:, :, None, None]*np.trace(gradu)
-        nu = self._constants['nu']
-
-        return -nu*(gradu + gradu.swapaxes(0, 1) - 2/3*bulk)

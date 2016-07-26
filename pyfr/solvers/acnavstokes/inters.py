@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from pyfr.backends.base.kernels import ComputeMetaKernel
 from pyfr.solvers.baseadvecdiff import (BaseAdvectionDiffusionBCInters,
                                         BaseAdvectionDiffusionIntInters,
                                         BaseAdvectionDiffusionMPIInters)
@@ -17,15 +18,20 @@ class ACNavierStokesIntInters(BaseAdvectionDiffusionIntInters):
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.intconu')
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.intcflux')
 
+        if abs(self._tpl_c['ldg-beta']) == 0.5:
+            self.kernels['copy_fpts'] = lambda: ComputeMetaKernel(
+                [ele.kernels['_copy_fpts']() for ele in elemap.values()]
+        )
+
         self.kernels['con_u'] = lambda: self._be.kernel(
             'intconu', tplargs=tplargs, dims=[self.ninterfpts],
-            ulin=self._scal0_lhs, urin=self._scal0_rhs,
-            ulout=self._vect0_lhs, urout=self._vect0_rhs
+            ulin=self._scal_lhs, urin=self._scal_rhs,
+            ulout=self._vect_lhs, urout=self._vect_rhs
         )
         self.kernels['comm_flux'] = lambda: self._be.kernel(
             'intcflux', tplargs=tplargs, dims=[self.ninterfpts],
-            ul=self._scal0_lhs, ur=self._scal0_rhs,
-            gradul=self._vect0_lhs, gradur=self._vect0_rhs,
+            ul=self._scal_lhs, ur=self._scal_rhs,
+            gradul=self._vect_lhs, gradur=self._vect_rhs,
             magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs
         )
 
@@ -104,10 +110,9 @@ class ACNavierStokesInflowBCInters(ACNavierStokesBaseBCInters):
     def __init__(self, be, lhs, elemap, cfgsect, cfg):
         super().__init__(be, lhs, elemap, cfgsect, cfg)
 
-        tplc, self._ploc = self._exp_opts(
+        tplc = self._exp_opts(
             ['u', 'v', 'w'][:self.ndims], lhs
         )
-
         self._tpl_c.update(tplc)
 
 
@@ -118,8 +123,7 @@ class ACNavierStokesOutflowBCInters(ACNavierStokesBaseBCInters):
     def __init__(self, be, lhs, elemap, cfgsect, cfg):
         super().__init__(be, lhs, elemap, cfgsect, cfg)
 
-        tplc, self._ploc = self._exp_opts(
+        tplc = self._exp_opts(
             ['p'], lhs
         )
-
         self._tpl_c.update(tplc)

@@ -29,7 +29,3 @@ class BaseDualIntegrator(BaseIntegrator):
     @abstractmethod
     def finalise_step(self, currsoln):
         pass
-
-    @abstractmethod
-    def _point_implicit_coeff(self, dt, stepper_coeff):
-        pass

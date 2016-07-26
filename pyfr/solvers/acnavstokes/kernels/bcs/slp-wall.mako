@@ -6,7 +6,7 @@
 <%include file='pyfr.solvers.acnavstokes.kernels.flux'/>
 
 <%pyfr:macro name='bc_ldg_state' params='ul, nl, ur, ploc, t'>
-    fpdtype_t nor = ${' + '.join('ul[{1}]*nl[{0}]'.format(i, i + 1)
+    fpdtype_t nor = ${' + '.join('nl[{0}]*ul[{1}]'.format(i, i + 1)
                                  for i in range(ndims))};
     ur[0] = ul[0];
 % for i in range(ndims):

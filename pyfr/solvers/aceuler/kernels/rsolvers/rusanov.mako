@@ -3,17 +3,13 @@
 <%include file='pyfr.solvers.aceuler.kernels.flux'/>
 
 <%pyfr:macro name='rsolve' params='ul, ur, n, nf'>
-    // Compute the left and right fluxes + velocities and pressures
     fpdtype_t fl[${ndims}][${nvars}], fr[${ndims}][${nvars}];
-    fpdtype_t vl[${ndims}], vr[${ndims}];
 
     ${pyfr.expand('inviscid_flux', 'ul', 'fl')};
     ${pyfr.expand('inviscid_flux', 'ur', 'fr')};
 
-% for i in range(ndims):
-    vl[${i}] = ul[${i + 1}];
-    vr[${i}] = ur[${i + 1}];
-% endfor
+    fpdtype_t vl[${ndims}] = ${pyfr.array('ul[{i}]', i=(1, ndims + 1))};
+    fpdtype_t vr[${ndims}] = ${pyfr.array('ur[{i}]', i=(1, ndims + 1))};
 
     // Normal of the average interface velocity
     fpdtype_t nv = 0.5*${pyfr.dot('n[{i}]', 'vl[{i}] + vr[{i}]', i=ndims)};

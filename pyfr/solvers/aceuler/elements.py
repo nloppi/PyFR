@@ -4,7 +4,7 @@ from pyfr.solvers.baseadvec import BaseAdvectionElements
 
 
 class BaseACFluidElements(object):
-    formulations = ['std', 'dual']
+    formulations = ['dual']
 
     privarmap = {2: ['p', 'u', 'v'],
                  3: ['p', 'u', 'v', 'w']}

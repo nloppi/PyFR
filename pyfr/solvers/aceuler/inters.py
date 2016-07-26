@@ -17,7 +17,7 @@ class ACEulerIntInters(BaseAdvectionIntInters):
 
         self.kernels['comm_flux'] = lambda: self._be.kernel(
             'intcflux', tplargs=tplargs, dims=[self.ninterfpts],
-            ul=self._scal0_lhs, ur=self._scal0_rhs,
+            ul=self._scal_lhs, ur=self._scal_rhs,
             magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs
         )
 
@@ -34,7 +34,7 @@ class ACEulerMPIInters(BaseAdvectionMPIInters):
 
         self.kernels['comm_flux'] = lambda: self._be.kernel(
             'mpicflux', tplargs, dims=[self.ninterfpts],
-            ul=self._scal0_lhs, ur=self._scal0_rhs,
+            ul=self._scal_lhs, ur=self._scal_rhs,
             magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs
         )
 
