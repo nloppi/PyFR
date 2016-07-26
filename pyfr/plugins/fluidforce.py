@@ -54,7 +54,7 @@ class BaseFluidForcePlugin(BasePlugin):
                 header += ['vx', 'vy', 'vz'][:self.ndims]
 
             # Open
-            self.outf = init_csv(self.cfg, cfgsect, header)
+            self.outf = init_csv(self.cfg, cfgsect, ','.join(header))
 
         # Interpolation matrices and quadrature weights
         self._m0 = m0 = {}
