@@ -50,7 +50,7 @@ class ACEulerBaseBCInters(BaseAdvectionBCInters):
                        c=self._tpl_c, bctype=self.type)
 
         self.kernels['comm_flux'] = lambda: self._be.kernel(
-            'bccflux', tplargs, dims=[self.ninterfpts], ul=self._scal0_lhs,
+            'bccflux', tplargs, dims=[self.ninterfpts], ul=self._scal_lhs,
             magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs
         )
 
@@ -61,7 +61,7 @@ class ACEulerInflowBCInters(ACEulerBaseBCInters):
     def __init__(self, be, lhs, elemap, cfgsect, cfg):
         super().__init__(be, lhs, elemap, cfgsect, cfg)
 
-        tplc, self._ploc = self._exp_opts(
+        tplc = self._exp_opts(
             ['u', 'v', 'w'][:self.ndims], lhs
         )
         self._tpl_c.update(tplc)
@@ -73,7 +73,7 @@ class ACEulerOutflowBCInters(ACEulerBaseBCInters):
     def __init__(self, be, lhs, elemap, cfgsect, cfg):
         super().__init__(be, lhs, elemap, cfgsect, cfg)
 
-        tplc, self._ploc = self._exp_opts(
+        tplc = self._exp_opts(
             ['p'], lhs
         )
         self._tpl_c.update(tplc)
