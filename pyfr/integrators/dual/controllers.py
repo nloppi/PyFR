@@ -34,10 +34,6 @@ class BaseDualController(BaseDualIntegrator):
         # Fire off any event handlers
         self.completed_step_handlers(self)
 
-    @property
-    def nsteps(self):
-        return self.nacptsteps + self.nrjctsteps
-
 
 class DualNoneController(BaseDualController):
     controller_name = 'none'
@@ -47,12 +43,15 @@ class DualNoneController(BaseDualController):
 
         sect = 'solver-time-integrator'
 
-        self._innersteps = 0
-        self._idxprev = 0
-        self._maxniters = self.cfg.getint(sect, 'niters')
-        self._atol = self.cfg.getfloat(sect, 'atol', default=1e-6)
-        self._rtol = self.cfg.getfloat(sect, 'rtol', default=1e-6)
-        self._chkevery = self.cfg.getfloat(sect, 'chk', default=5)
+        self._maxniters = self.cfg.getint(sect, 'pseudo-niters-max')
+        self._minniters = self.cfg.getint(sect, 'pseudo-niters-min')
+
+        if self._maxniters < self._minniters:
+            raise ValueError('The maximum number of pseudo-iterations must '
+                             'be greater than or equal to the minimum')
+
+        self._pseudo_aresid = self.cfg.getfloat(sect, 'pseudo-aresid')
+        self._pseudo_rresid = self.cfg.getfloat(sect, 'pseudo-rresid')
 
     def advance_to(self, t):
         if t < self.tcurr:
@@ -65,13 +64,14 @@ class DualNoneController(BaseDualController):
 
                 # Take the step
                 self._idxcurr, self._idxprev = self.step(self.tcurr, dt, dtau)
-                self._innersteps += 1
-                if self._innersteps % self._chkevery == 0:
+
+                # Activate convergence monitoring after pseudo-niters-min
+                if i >= self._minniters - 1:
                     # Subtract the current solution from the previous solution
-                    self._add(1.0, self._idxprev, -1.0, self._idxcurr)
-                    # Compute the normalised residual
-                    resid = self._resid(self._idxprev, self._idxcurr)
-                    if resid < 1.0:
+                    self._add(-1.0/dtau, self._idxprev, 1.0/dtau, self._idxcurr)
+
+                    # Compute the normalised residual and check for convergence
+                    if self._resid(self._idxprev, self._idxcurr) < 1.0:
                         break
 
             # Update the dual-time stepping banks (n+1 => n, n => n-1)
@@ -87,12 +87,12 @@ class DualNoneController(BaseDualController):
     def _resid(self, x, y):
         comm, rank, root = get_comm_rank_root()
 
-        # Get an errest kern to compute the maximum residual
+        # Get an errest kern to compute the square of the maximum residual
         errest = self._get_errest_kerns()
 
         # Prepare and run the kernel
         self._prepare_reg_banks(x, y, y)
-        self._queue % errest(self._atol, self._rtol)
+        self._queue % errest(self._pseudo_aresid, self._pseudo_rresid)
 
         # Reduce locally (element types) and globally (MPI ranks)
         rl = max(errest.retval)
