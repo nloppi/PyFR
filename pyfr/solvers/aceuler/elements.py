@@ -32,8 +32,8 @@ class BaseACFluidElements(object):
 
 
 class ACEulerElements(BaseACFluidElements, BaseAdvectionElements):
-    def set_backend(self, backend, nscalupts):
-        super().set_backend(backend, nscalupts)
+    def set_backend(self, backend, nscalupts, nonce):
+        super().set_backend(backend, nscalupts, nonce)
 
         # Register our flux kernel
         backend.pointwise.register('pyfr.solvers.aceuler.kernels.tflux')

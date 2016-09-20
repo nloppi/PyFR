@@ -6,8 +6,8 @@ from pyfr.solvers.baseadvecdiff import BaseAdvectionDiffusionElements
 
 class ACNavierStokesElements(BaseACFluidElements,
                              BaseAdvectionDiffusionElements):
-    def set_backend(self, backend, nscalupts):
-        super().set_backend(backend, nscalupts)
+    def set_backend(self, backend, nscalupts, nonce):
+        super().set_backend(backend, nscalupts, nonce)
         backend.pointwise.register('pyfr.solvers.acnavstokes.kernels.tflux')
 
         tplargs = dict(ndims=self.ndims, nvars=self.nvars,
