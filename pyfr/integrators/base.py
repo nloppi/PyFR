@@ -55,11 +55,35 @@ class BaseIntegrator(object, metaclass=ABCMeta):
         # Determine the amount of temp storage required by this method
         nreg = self._stepper_nregs
 
-        # Construct the relevant mesh partition
-        self.system = systemcls(backend, rallocs, mesh, initsoln, nreg, cfg)
+        # These are now lists. If no multigrid they hold only one element
+        self.system = []
+        self._regs = []
+        self._regidx = []
+        self._idxcurr = []
 
-        # Storage register banks
-        self._regs, self._regidx = self._get_reg_banks(nreg)
+        if self.cfg.get('solver-time-integrator', 'controller') == 'mg':
+            # Multigrid requires 3 additional registers
+            nreg += 3
+            self.leveliters = self.cfg.getintlist('solver-time-integrator',
+                                                  'cycle')
+            self.levels = len(self.leveliters)
+
+            # Initialise multiple systems for multigird
+            for level in range(self.levels):
+                self.system.append(systemcls(backend, rallocs, mesh, initsoln,
+                                              nreg, cfg, level))
+                self._regs.append(self._get_reg_banks(nreg, level)[0])
+                self._regidx.append(self._get_reg_banks(nreg, level)[1])
+                self._idxcurr.append(0)
+
+        else:
+            # Construct the relevant mesh partition
+            self._idxcurr.append(0)
+            self.system.append(systemcls(backend, rallocs, mesh,
+                                         initsoln, nreg, cfg))
+            # Storage register banks
+            self._regs.append(self._get_reg_banks(nreg, level=0)[0])
+            self._regidx.append(self._get_reg_banks(nreg, level=0)[1])
 
         # Extract the UUID of the mesh (to be saved with solutions)
         self.mesh_uuid = mesh['mesh_uuid']
@@ -69,9 +93,6 @@ class BaseIntegrator(object, metaclass=ABCMeta):
 
         # Global degree of freedom count
         self._gndofs = self._get_gndofs()
-
-        # Bank index of solution
-        self._idxcurr = 0
 
         # Solution cache
         self._curr_soln = None
@@ -86,16 +107,16 @@ class BaseIntegrator(object, metaclass=ABCMeta):
         self.completed_step_handlers = proxylist(self._get_plugins())
 
         # Delete the memory-intensive elements map from the system
-        del self.system.ele_map
+        #del self.system.ele_map
 
-    def _get_reg_banks(self, nreg):
+    def _get_reg_banks(self, nreg, level):
         regs, regidx = [], list(range(nreg))
 
         # Create a proxylist of matrix-banks for each storage register
         for i in regidx:
             regs.append(
                 proxylist([self.backend.matrix_bank(em, i)
-                           for em in self.system.ele_banks])
+                           for em in self.system[level].ele_banks])
             )
 
         return regs, regidx
@@ -104,7 +125,7 @@ class BaseIntegrator(object, metaclass=ABCMeta):
         comm, rank, root = get_comm_rank_root()
 
         # Get the number of degrees of freedom in this partition
-        ndofs = sum(self.system.ele_ndofs)
+        ndofs = sum(self.system[0].ele_ndofs)
 
         # Sum to get the global number over all partitions
         return comm.allreduce(ndofs, op=get_mpi('sum'))
@@ -122,9 +143,9 @@ class BaseIntegrator(object, metaclass=ABCMeta):
 
         return plugins
 
-    def _get_kernels(self, name, nargs, **kwargs):
+    def _get_kernels(self, name, nargs, level=0, **kwargs):
         # Transpose from [nregs][neletypes] to [neletypes][nregs]
-        transregs = zip(*self._regs)
+        transregs = zip(*self._regs[0])
 
         # Generate an kernel for each element type
         kerns = proxylist([])
@@ -133,20 +154,20 @@ class BaseIntegrator(object, metaclass=ABCMeta):
 
         return kerns
 
-    def _prepare_reg_banks(self, *bidxes):
-        for reg, ix in zip(self._regs, bidxes):
+    def _prepare_reg_banks(self, *bidxes, level=0):
+        for reg, ix in zip(self._regs[0], bidxes):
             reg.active = ix
 
     @memoize
-    def _get_axnpby_kerns(self, n, subdims=None):
-        return self._get_kernels('axnpby', nargs=n, subdims=subdims)
+    def _get_axnpby_kerns(self, n, level=0, subdims=None):
+        return self._get_kernels('axnpby', nargs=n, level=level, subdims=subdims)
 
-    def _add(self, *args):
+    def _add(self, *args, level=0):
         # Get a suitable set of axnpby kernels
-        axnpby = self._get_axnpby_kerns(len(args) // 2)
+        axnpby = self._get_axnpby_kerns(len(args) // 2, level=level)
 
         # Bank indices are in odd-numbered arguments
-        self._prepare_reg_banks(*args[1::2])
+        self._prepare_reg_banks(*args[1::2], level=level)
 
         # Bind and run the axnpby kernels
         self._queue % axnpby(*args[::2])
@@ -170,7 +191,7 @@ class BaseIntegrator(object, metaclass=ABCMeta):
     def soln(self):
         # If we do not have the solution cached then fetch it
         if not self._curr_soln:
-            self._curr_soln = self.system.ele_scal_upts(self._idxcurr)
+            self._curr_soln = self.system[0].ele_scal_upts(self._idxcurr[0])
 
         return self._curr_soln
 
@@ -231,3 +252,138 @@ class BaseIntegrator(object, metaclass=ABCMeta):
             return ret
         else:
             return {'config': cfg, 'config-0': cfg}
+
+    @memoize
+    def prolrest(self, l1, l2, source=None):
+        prolrestkerns = proxylist([])
+
+        for etype in self.system[0].ele_types:
+            l1sys = self.system[l1]
+            l2sys = self.system[l2]
+
+            l1eles = l1sys.ele_map[etype]
+            l2eles = l2sys.ele_map[etype]
+
+            # fix
+            if l2 < l1:
+                prolrestkerns.append(
+                    self.backend.kernel('mul',
+                                        self._get_prolong(l1eles, l2eles),
+                                        l1eles.scal_upts_inb,
+                                        out=l2eles.scal_upts_inb)
+                )
+
+            elif l2 > l1:
+                prolrestkerns.append(
+                    self.backend.kernel('mul',
+                                        self._get_prolong(l1eles, l2eles), #NOW UNDERSAMPLING INSTEAD OF VDM CHOP
+                                        l1eles.scal_upts_inb,
+                                        out=l2eles.scal_upts_inb)
+                )
+
+            elif source:
+                prolrestkerns.append(
+                    self.backend.kernel('mul',
+                                        self._get_prolong(l1eles, l2eles),
+                                        l1eles.scal_upts_inb,
+                                        out=l2eles.scal_upts_inb)
+                )
+            else:
+                print('Restriction/Prolongation must be done '
+                  ' between two different polynomial levels')
+
+        return prolrestkerns
+
+    def restrict(self, l1, l2):
+        rhs1 = self.system[l1].rhs
+        rhs2 = self.system[l2].rhs
+        idxcurr = self._idxcurr
+        regidx = self._regidx
+
+        mgregidx = self._MG_regidx
+        add_with_dts = self._add_with_dts
+
+        # -R temporarility to last mgstepper index of l1
+        rhs1(self.tcurr, idxcurr[l1], regidx[l1][mgregidx[1]])
+        if l1 == 0:
+            l = 0
+        else:
+            l = 1
+
+        # d = r - (rhs - source(r1)) to the second MG index of l1. check signs
+        add_with_dts(-1, regidx[l1][mgregidx[1]], l, regidx[l1][mgregidx[0]],
+                     c=-1/self._dt,  level=l1)
+
+        # Restrict Q and d, store Q^start to the last stepper index of l2,
+        # compute r
+        self.system[l1].eles_scal_upts_inb.active = idxcurr[l1]
+        self.system[l2].eles_scal_upts_inb.active = idxcurr[l2]
+        self._queue % self.prolrest(l1, l2)()
+
+        self._add(0.0, regidx[l2][mgregidx[-1]], 1, idxcurr[l2], level=l2)
+
+        self.system[l1].eles_scal_upts_inb.active = regidx[l1][mgregidx[1]]
+        self.system[l2].eles_scal_upts_inb.active = regidx[l2][mgregidx[1]]
+        self._queue % self.prolrest(l1, l2)()
+
+        # -R(Q^s) temporarility to MG regidx0
+        rhs2(0.0, idxcurr[l2], regidx[l2][mgregidx[0]])
+
+        # r = -RHS - dtssrc + d
+        add_with_dts(1, regidx[l2][mgregidx[0]], 1, regidx[l2][mgregidx[1]],
+                     c=1/self._dt, level=l2)
+
+        # Source terms at new solnpts
+        for srcidx in self._source_regidx:
+            self.system[l1].eles_scal_upts_inb.active = self._regidx[l1][srcidx]
+            self.system[l2].eles_scal_upts_inb.active = self._regidx[l2][srcidx]
+            self.prolrest(l1, l2, source=True)
+            self._queue % self.prolrest(l1, l2)()
+
+    def prolongate(self, l1, l2):
+        idxcurrs = self._idxcurr
+        regidx = self._regidx
+        mgregidx = self._MG_regidx
+
+        # Calculate the correction
+        self._add(0, regidx[l1][mgregidx[1]], 1, idxcurrs[l1], -1,
+                  regidx[l1][mgregidx[-1]], level=l1)
+
+        # Prolongation for the correction
+        self.system[l1].eles_scal_upts_inb.active = regidx[l1][mgregidx[1]]
+        self.system[l2].eles_scal_upts_inb.active = regidx[l2][mgregidx[1]]
+        self._queue % self.prolrest(l1, l2)()
+
+        # Add the correction to the end quantity at l2
+        self._add(1, idxcurrs[l2], 1, regidx[l2][mgregidx[1]], level=l2)
+
+    def _get_restrict(self, name, l1eles, l2eles):
+        l1b = l1eles.basis
+        l2b = l2eles.basis
+        ord = l1b.order
+        ub1 = l1b.ubasis
+        ub2 = l2b.ubasis
+
+        if name == 'quad':
+            a = np.eye(l2b.nupts, l1b.nupts)
+            for i in range(1, ord):
+                a[(ord*i):ord*(i + 1)] = np.roll(a[(ord*i):ord*(i + 1)], i,
+                                                 axis=1)
+
+        if name == 'tri':
+            a = np.eye(ub2.nupts, ub1.nupts)
+            j = 0
+            for i in range(ord - 1):
+                j += ord - i
+                a[j:j+(ord - i - 1)] = np.roll(a[j:j + (ord - i - 1)], i + 1,
+                                               axis=1)
+
+        mat = np.dot(ub2.vdm, np.dot(a, np.linalg.inv(ub1.vdm)))
+        return self.backend.const_matrix(mat, tags={'align'})
+
+    def _get_prolong(self, l1eles, l2eles):
+        ub1 = l1eles.basis.ubasis
+        l2b = l2eles.basis
+
+        mat = ub1.nodal_basis_at(l2b.upts)
+        return self.backend.const_matrix(mat, tags={'align'})

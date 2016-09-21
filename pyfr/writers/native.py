@@ -34,9 +34,9 @@ class NativeWriter(object):
         comm, rank, root = get_comm_rank_root()
 
         # Get the type and shape of each element in the partition
-        etypes = intg.system.ele_types
+        etypes = intg.system[0].ele_types
         shapes = [(nupts, nvars, neles)
-                  for nupts, _, neles in intg.system.ele_shapes]
+                  for nupts, _, neles in intg.system[0].ele_shapes]
 
         # Gather
         eleinfo = comm.allgather(zip(etypes, shapes))

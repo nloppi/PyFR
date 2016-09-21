@@ -23,7 +23,7 @@ class WriterPlugin(BasePlugin):
         self.tout_next = intg.tcurr
 
         # Output field names
-        self.fields = intg.system.elementscls.convarmap[self.ndims]
+        self.fields = intg.system[0].elementscls.convarmap[self.ndims]
 
         # Register our output times with the integrator
         intg.call_plugin_dt(self.dt_out)
@@ -52,7 +52,7 @@ class WriterPlugin(BasePlugin):
         solnfname = self._writer.write(intg.soln, metadata, intg.tcurr)
 
         # If a post-action has been registered then invoke it
-        self._invoke_postaction(mesh=intg.system.mesh.fname, soln=solnfname,
+        self._invoke_postaction(mesh=intg.system[0].mesh.fname, soln=solnfname,
                                 t=intg.tcurr)
 
         # Compute the next output time

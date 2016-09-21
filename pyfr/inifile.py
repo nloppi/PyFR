@@ -97,6 +97,14 @@ class Inifile(object):
     def getint(self, section, option, default=_sentinel):
         return int(self.get(section, option, default))
 
+    def getintlist(self, section, option, default=_sentinel):
+        tmp = self.get(section, option, default).split(',')
+        return [int(e) for e in tmp]
+
+    def getfloatlist(self, section, option, default=_sentinel):
+        tmp = self.get(section, option, default).split(',')
+        return [float(e) for e in tmp]
+
     def getliteral(self, section, option, default=_sentinel):
         return literal_eval(self.get(section, option, default))
 

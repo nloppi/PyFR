@@ -22,11 +22,11 @@ class BaseDualController(BaseDualIntegrator):
         self.nacptsteps += 1
         self.nacptchain += 1
 
-        self._idxcurr = idxcurr
+        self._idxcurr[0] = idxcurr
 
         # Filter
         if self._fnsteps and self.nacptsteps % self._fnsteps == 0:
-            self.system.filt(idxcurr)
+            self.system[0].filt(idxcurr)
 
         # Invalidate the solution cache
         self._curr_soln = None
@@ -63,22 +63,22 @@ class DualNoneController(BaseDualController):
                 dtau = max(min(t - self.tcurr, self._dtau), self.dtaumin)
 
                 # Take the step
-                self._idxcurr, self._idxprev = self.step(self.tcurr, dt, dtau)
+                self._idxcurr[0], self._idxprev = self.step(self.tcurr, dt, dtau)
 
                 # Activate convergence monitoring after pseudo-niters-min
                 if i >= self._minniters - 1:
                     # Subtract the current solution from the previous solution
-                    self._add(-1.0/dtau, self._idxprev, 1.0/dtau, self._idxcurr)
+                    self._add(-1.0/dtau, self._idxprev, 1.0/dtau, self._idxcurr[0])
 
                     # Compute the normalised residual and check for convergence
-                    if self._resid(self._idxprev, self._idxcurr) < 1.0:
+                    if self._resid(self._idxprev, self._idxcurr[0]) < 1.0:
                         break
 
             # Update the dual-time stepping banks (n+1 => n, n => n-1)
-            self.finalise_step(self._idxcurr)
+            self.finalise_step(self._idxcurr[0])
 
             # We are not adaptive, so accept every step
-            self._accept_step(dt, self._idxcurr)
+            self._accept_step(dt, self._idxcurr[0])
 
     @memoize
     def _get_errest_kerns(self):
@@ -100,3 +100,47 @@ class DualNoneController(BaseDualController):
 
         # Normalise
         return math.sqrt(rg)
+
+
+class DualMGController(BaseDualController):
+    controller_name = 'mg'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._niters = self.cfg.getint('solver-time-integrator', 'mg-cycles')
+
+    def advance_to(self, t):
+        if t < self.tcurr:
+            raise ValueError('Advance time is in the past')
+
+        while self.tcurr < t:
+            dt = max(min(t - self.tcurr, self._dt), self.dtmin)
+
+            # Number of V-cycles
+            for i in range(self._niters):
+
+                # V-cycle down
+                for j in range(self.levels - 1):
+                    for k in range(self.leveliters[j]):
+                        dtau = max(min(t - self.tcurr, self._dtaus[j]), self.dtaumin)
+                        self._idxcurr[j], self._idxprev = self.step(self.tcurr, dt, dtau, level=j)
+                    self.restrict(j, j+1)
+
+                # V-cycle up
+                for j in range(self.levels - 1):
+                    for k in range(self.leveliters[self.levels - 1 - j]):
+                        dtau = max(min(t - self.tcurr, self._dtaus[self.levels - 1 - j]), self.dtaumin)
+                        self._idxcurr[self.levels - 1 - j], self._idxprev = self.step(self.tcurr, dt, dtau, level=(self.levels - 1 - j))
+                    self.prolongate(self.levels - 1 - j, self.levels - 1 - (j + 1))
+
+                # Post-smoothing at the highest level
+                for k in range(self.leveliters[0]):
+                    dtau = max(min(t - self.tcurr, self._dtaus[0]), self.dtaumin)
+                    self._idxcurr[0], self._idxprev = self.step(self.tcurr, dt, dtau, level=0)
+
+            # Update the dual-time stepping banks (n+1 => n, n => n-1)
+            self.finalise_step(self._idxcurr[0])
+
+            # We are not adaptive, so accept every step
+            self._accept_step(dt, self._idxcurr[0])

@@ -39,8 +39,8 @@ class BasePlugin(object, metaclass=ABCMeta):
 
         self.suffix = suffix
 
-        self.ndims = intg.system.ndims
-        self.nvars = intg.system.nvars
+        self.ndims = intg.system[0].ndims
+        self.nvars = intg.system[0].nvars
 
         # Tolerance for time comparisons
         self.tol = 5*intg.dtmin
@@ -59,9 +59,9 @@ class BasePlugin(object, metaclass=ABCMeta):
                 raise ValueError('Invalid post action mode')
 
         # Check that we support this particular system
-        if not ('*' in self.systems or intg.system.name in self.systems):
+        if not ('*' in self.systems or intg.system[0].name in self.systems):
             raise RuntimeError('System {0} not supported by plugin {1}'
-                               .format(intg.system.name, self.name))
+                               .format(intg.system[0].name, self.name))
 
     def __del__(self):
         if self.postactaid is not None:

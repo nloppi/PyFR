@@ -7,9 +7,9 @@ class BaseDualStepper(BaseDualIntegrator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        elementscls = self.system.elementscls
-        self._subdims = [elementscls.convarmap[self.system.ndims].index(v)
-                         for v in elementscls.dualcoeffs[self.system.ndims]]
+        elementscls = self.system[0].elementscls
+        self._subdims = [elementscls.convarmap[self.system[0].ndims].index(v)
+                         for v in elementscls.dualcoeffs[self.system[0].ndims]]
 
     @property
     def _stepper_nregs(self):
