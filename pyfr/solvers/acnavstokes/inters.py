@@ -23,6 +23,17 @@ class ACNavierStokesIntInters(BaseAdvectionDiffusionIntInters):
                 [ele.kernels['_copy_fpts']() for ele in elemap.values()]
         )
 
+        sponge_type = self.cfg.get('sponge', 'sponge-type', 'none')
+
+        if sponge_type == 'visc':
+            tplargs['spng_vis'] = 'mu'
+            spngmu = self._const_mat(lhs, 'get_sponge_mu_for_inter')
+        elif sponge_type == 'none':
+            tplargs['spng_vis'] = 'none'
+            spngmu = None
+        else:
+            raise ValueError('Invalid sponge-type option')
+
         self.kernels['con_u'] = lambda: self._be.kernel(
             'intconu', tplargs=tplargs, dims=[self.ninterfpts],
             ulin=self._scal_lhs, urin=self._scal_rhs,
@@ -32,7 +43,8 @@ class ACNavierStokesIntInters(BaseAdvectionDiffusionIntInters):
             'intcflux', tplargs=tplargs, dims=[self.ninterfpts],
             ul=self._scal_lhs, ur=self._scal_rhs,
             gradul=self._vect_lhs, gradur=self._vect_rhs,
-            magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs
+            magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs,
+            spngmu=spngmu
         )
 
 
@@ -45,6 +57,17 @@ class ACNavierStokesMPIInters(BaseAdvectionDiffusionMPIInters):
         tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver,
                        c=self._tpl_c)
 
+        sponge_type = self.cfg.get('sponge', 'sponge-type', 'none')
+
+        if sponge_type == 'visc':
+            tplargs['spng_vis'] = 'mu'
+            spngmu = self._const_mat(lhs, 'get_sponge_mu_for_inter')
+        elif sponge_type == 'none':
+            tplargs['spng_vis'] = 'none'
+            spngmu = None
+        else:
+            raise ValueError('Invalid sponge-type option')
+
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.mpiconu')
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.mpicflux')
 
@@ -56,7 +79,8 @@ class ACNavierStokesMPIInters(BaseAdvectionDiffusionMPIInters):
             'mpicflux', tplargs=tplargs, dims=[self.ninterfpts],
             ul=self._scal_lhs, ur=self._scal_rhs,
             gradul=self._vect_lhs, gradur=self._vect_rhs,
-            magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs
+            magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs,
+            spngmu=spngmu
         )
 
 
@@ -72,6 +96,17 @@ class ACNavierStokesBaseBCInters(BaseAdvectionDiffusionBCInters):
                        c=self._tpl_c, bctype=self.type,
                        bccfluxstate=self.cflux_state)
 
+        sponge_type = self.cfg.get('sponge', 'sponge-type', 'none')
+
+        if sponge_type == 'visc':
+            tplargs['spng_vis'] = 'mu'
+            spngmu = self._const_mat(lhs, 'get_sponge_mu_for_inter')
+        elif sponge_type == 'none':
+            tplargs['spng_vis'] = 'none'
+            spngmu = None
+        else:
+            raise ValueError('Invalid sponge-type option')
+
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.bcconu')
         self._be.pointwise.register('pyfr.solvers.acnavstokes.kernels.bccflux')
 
@@ -84,7 +119,7 @@ class ACNavierStokesBaseBCInters(BaseAdvectionDiffusionBCInters):
             'bccflux', tplargs=tplargs, dims=[self.ninterfpts],
             ul=self._scal_lhs, gradul=self._vect_lhs,
             magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs,
-            ploc=self._ploc
+            ploc=self._ploc, spngmul=spngmu
         )
 
 

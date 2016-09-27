@@ -12,6 +12,7 @@
               ur='inout mpi fpdtype_t[${str(nvars)}]'
               gradul='in view fpdtype_t[${str(ndims)}][${str(nvars)}]'
               gradur='in mpi fpdtype_t[${str(ndims)}][${str(nvars)}]'
+              spngmu='in fpdtype_t'
               nl='in fpdtype_t[${str(ndims)}]'
               magnl='in fpdtype_t'>
     // Perform the Riemann solve
@@ -20,12 +21,12 @@
 
 % if beta != -0.5:
     fpdtype_t fvl[${ndims}][${nvars}] = {{0}};
-    ${pyfr.expand('viscous_flux_add', 'ul', 'gradul', 'fvl')};
+    ${pyfr.expand('viscous_flux_add', 'ul', 'gradul', 'spngmu', 'fvl')};
 % endif
 
 % if beta != 0.5:
     fpdtype_t fvr[${ndims}][${nvars}] = {{0}};
-    ${pyfr.expand('viscous_flux_add', 'ur', 'gradur', 'fvr')};
+    ${pyfr.expand('viscous_flux_add', 'ur', 'gradur', 'spngmu', 'fvr')};
 % endif
 
 % for i in range(nvars):

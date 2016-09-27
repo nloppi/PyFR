@@ -5,7 +5,7 @@ import math
 import re
 
 import numpy as np
-
+from pyfr.nputil import fuzzysort, npeval
 from pyfr.nputil import npeval, fuzzysort
 from pyfr.util import lazyprop, memoize
 
@@ -324,6 +324,13 @@ class BaseElements(object, metaclass=ABCMeta):
             djacs = np.einsum('ij...,ji...->j...', jac[0], smats[0])
 
         return smats.reshape(ndims, nmpts, -1), djacs
+
+    def get_sponge_mu_for_inter(self, eidx, fidx):
+        ploc = self.get_ploc_for_inter(eidx, fidx).transpose()
+        spngmu_expr = self.cfg.get('sponge', 'sponge-mu')
+
+        return npeval(spngmu_expr,
+            {d: ploc[i] for i, d in enumerate('xyz'[:self.ndims])})
 
     def get_mag_pnorms(self, eidx, fidx):
         fpts_idx = self.basis.facefpts[fidx]
