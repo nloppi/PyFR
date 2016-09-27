@@ -27,7 +27,7 @@ class BaseDualIntegrator(BaseIntegrator):
 
     @property
     def _source_regidx(self):
-        return self._regidx[0][self._pseudo_stepper_nregs:]
+        return self._regidx[0][self._pseudo_stepper_nregs:self._pseudo_stepper_nregs+len(self._dual_time_source)-1]
 
     @property
     def _MG_regidx(self):

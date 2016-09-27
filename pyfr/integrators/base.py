@@ -145,7 +145,7 @@ class BaseIntegrator(object, metaclass=ABCMeta):
 
     def _get_kernels(self, name, nargs, level=0, **kwargs):
         # Transpose from [nregs][neletypes] to [neletypes][nregs]
-        transregs = zip(*self._regs[0])
+        transregs = zip(*self._regs[level])
 
         # Generate an kernel for each element type
         kerns = proxylist([])
@@ -155,7 +155,7 @@ class BaseIntegrator(object, metaclass=ABCMeta):
         return kerns
 
     def _prepare_reg_banks(self, *bidxes, level=0):
-        for reg, ix in zip(self._regs[0], bidxes):
+        for reg, ix in zip(self._regs[level], bidxes):
             reg.active = ix
 
     @memoize
