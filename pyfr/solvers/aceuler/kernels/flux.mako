@@ -1,20 +1,27 @@
 # -*- coding: utf-8 -*-
 <%namespace module='pyfr.backends.base.makoutil' name='pyfr'/>
 
-<%pyfr:macro name='inviscid_flux' params='s, f'>
+<%pyfr:macro name='inviscid_flux' params='s, f, pseudodts, le'>
     // Velocity in the indices 1 to ndims+1 of the conservative variable array
-   fpdtype_t v[] = ${pyfr.array('s[{i}]', i=(1, ndims + 1))};
+    fpdtype_t v[] = ${pyfr.array('s[{i}]', i=(1, ndims + 1))};
 
     // Pressure in the conservative variable array index 0
     fpdtype_t p = s[0];
 
+    // Relaxation factor and wavespeed
+    fpdtype_t aczeta = sqrt(${'+'.join('v[{0}]*v[{0}]'.format(i) for i in range(ndims))});
+    fpdtype_t wvspd = sqrt(${'+'.join('v[{0}]*v[{0}]'.format(i) for i in range(ndims))}) + aczeta;
+
+    pseudodts = ${c['ac-cfl']}*le/wvspd;
+
     // Mass flux
 % for i in range(ndims):
-    f[${i}][0] = ${c['ac-zeta']}*v[${i}];
+    f[${i}][0] = aczeta*v[${i}];
 % endfor
 
     // Momentum fluxes
 % for i, j in pyfr.ndrange(ndims, ndims):
     f[${i}][${j + 1}] = v[${i}]*v[${j}]${' + p' if i == j else ''};
 % endfor
+
 </%pyfr:macro>

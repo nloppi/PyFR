@@ -148,7 +148,7 @@ class DualPseudoRK4Stepper(BaseDualPseudoStepper):
 
         # First stage; r1 = -∇·f(r0)
         rhs(t, r0, r1)
-
+        print(self.system.eles_scal_upts_pseudodt.get())
         # Second stage; r2 = r0 + dtau/2*r1 - dtau/2*dQ/dt; r2 = -∇·f(r2)
         add_with_dts(0, r2, 1, r0, dtau/2, r1, c=rat/2)
         rhs(t, r2, r2)

@@ -49,7 +49,7 @@ class BaseSystem(object, metaclass=ABCMeta):
         # I/O banks for the elements
         self.eles_scal_upts_inb = eles.scal_upts_inb
         self.eles_scal_upts_outb = eles.scal_upts_outb
-
+        self.eles_scal_upts_pseudodt = eles.pseudodt_upts
         # Save the number of dimensions and field variables
         self.ndims = eles[0].ndims
         self.nvars = eles[0].nvars

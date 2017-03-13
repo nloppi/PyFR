@@ -4,9 +4,10 @@
 
 <%pyfr:macro name='rsolve' params='ul, ur, n, nf'>
     fpdtype_t fl[${ndims}][${nvars}], fr[${ndims}][${nvars}];
+    fpdtype_t none;
 
-    ${pyfr.expand('inviscid_flux', 'ul', 'fl')};
-    ${pyfr.expand('inviscid_flux', 'ur', 'fr')};
+    ${pyfr.expand('inviscid_flux', 'ul', 'fl', 'none', '0.0')};
+    ${pyfr.expand('inviscid_flux', 'ur', 'fr', 'none', '0.0')};
 
     fpdtype_t vl[${ndims}] = ${pyfr.array('ul[{i}]', i=(1, ndims + 1))};
     fpdtype_t vr[${ndims}] = ${pyfr.array('ur[{i}]', i=(1, ndims + 1))};
@@ -15,7 +16,7 @@
     fpdtype_t nv = 0.5*${pyfr.dot('n[{i}]', 'vl[{i}] + vr[{i}]', i=ndims)};
 
     // Estimate the wave speed
-    fpdtype_t a = fabs(nv) + sqrt(nv*nv + ${c['ac-zeta']});
+    fpdtype_t a = fabs(nv) + sqrt(nv*nv + fabs(nv));
 
     // Output
 % for i in range(nvars):

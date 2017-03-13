@@ -7,10 +7,12 @@
 <%pyfr:kernel name='tflux' ndim='2'
               u='in fpdtype_t[${str(nvars)}]'
               smats='in fpdtype_t[${str(ndims)}][${str(ndims)}]'
-              f='inout fpdtype_t[${str(ndims)}][${str(nvars)}]'>
+              f='inout fpdtype_t[${str(ndims)}][${str(nvars)}]'
+              pseudodts='out fpdtype_t'
+              le = 'in broadcast fpdtype_t'>
     // Compute the flux (F = Fi + Fv)
     fpdtype_t ftemp[${ndims}][${nvars}];
-    ${pyfr.expand('inviscid_flux', 'u', 'ftemp')};
+    ${pyfr.expand('inviscid_flux', 'u', 'ftemp', 'pseudodts', 'le')};
     ${pyfr.expand('viscous_flux_add', 'u', 'f', 'ftemp')};
 
     // Transform the fluxes

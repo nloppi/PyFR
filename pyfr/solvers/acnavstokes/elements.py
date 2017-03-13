@@ -20,11 +20,14 @@ class ACNavierStokesElements(BaseACFluidElements,
             self.kernels['tdisf'] = lambda: backend.kernel(
                 'tflux', tplargs=tplargs, dims=[self.nqpts, self.neles],
                 u=self._scal_qpts, smats=self.smat_at('qpts'),
-                f=self._vect_qpts
+                f=self._vect_qpts, pseudodts=self.pseudodt_upts,
+                le=self.char_len
             )
         else:
             self.kernels['tdisf'] = lambda: backend.kernel(
                 'tflux', tplargs=tplargs, dims=[self.nupts, self.neles],
                 u=self.scal_upts_inb, smats=self.smat_at('upts'),
-                f=self._vect_upts
+                f=self._vect_upts, pseudodts=self.pseudodt_upts,
+                le=self.char_len
             )
+
