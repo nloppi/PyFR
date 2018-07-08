@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from pyfr.integrators.dual.base import BaseDualIntegrator
+from pyfr.integrators.dual.pseudo.base import BaseDualPseudoIntegrator
 
 
-class BaseDualPseudoStepper(BaseDualIntegrator):
+class BaseDualPseudoStepper(BaseDualPseudoIntegrator):
     def collect_stats(self, stats):
         super().collect_stats(stats)
 
@@ -25,15 +25,11 @@ class BaseDualPseudoStepper(BaseDualIntegrator):
         self._prepare_reg_banks(fout, self._idxcurr, *self._source_regidx)
         self._queue % axnpby(1, *svals)
 
-    def finalise_step(self, currsoln):
-        pnreg, dtsnreg = self._pseudo_stepper_nregs, len(self._dual_time_source)
-
-        # Rotate the source registers to the right by one
-        self._regidx[pnreg:pnreg + dtsnreg - 1] = (self._source_regidx[-1:]
-                                                   + self._source_regidx[:-1])
-
-        # Copy the current soln into the first source register
-        self._add(0, self._regidx[pnreg], 1, currsoln)
+        # Multigrid r addition
+        if self._multip_regidx:
+            axnpby = self._get_axnpby_kerns(2)
+            self._prepare_reg_banks(fout, self._multip_regidx[0])
+            self._queue % axnpby(1, -1)
 
 
 class DualPseudoEulerStepper(BaseDualPseudoStepper):

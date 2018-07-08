@@ -1,17 +1,47 @@
 # -*- coding: utf-8 -*-
 
 from pyfr.integrators.base import BaseIntegrator
+from pyfr.integrators.basecommon import BaseCommon
+from pyfr.util import proxylist
 
 
-class BaseStdIntegrator(BaseIntegrator):
+class BaseStdIntegrator(BaseCommon, BaseIntegrator):
     formulation = 'std'
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, backend, systemcls, rallocs, mesh, initsoln, cfg):
 
         # Sanity checks
         if self._controller_needs_errest and not self._stepper_has_errest:
             raise TypeError('Incompatible stepper/controller combination')
+
+        # Determine the amount of temp storage required by this method
+        self.nreg = self._stepper_nregs
+
+        # Construct the relevant mesh partition
+        self.system = systemcls(backend, rallocs, mesh, initsoln,
+                                nreg=self._stepper_nregs, cfg=cfg)
+
+        super().__init__(backend, systemcls, rallocs, mesh, initsoln, cfg)
+
+        # Storage for register banks and current index
+        self._init_reg_banks(backend, self.system)
+
+        # Global degree of freedom count
+        self._gndofs = self._get_gndofs(self.system)
+
+        # Add kernel cache
+        self._axnpby_kerns = {}
+
+        # Event handlers for advance_to
+        self.completed_step_handlers = proxylist(self._get_plugins())
+
+    @property
+    def soln(self):
+        # If we do not have the solution cached then fetch it
+        if not self._curr_soln:
+            self._curr_soln = self.system.ele_scal_upts(self._idxcurr)
+
+        return self._curr_soln
 
     @property
     def _controller_needs_errest(self):

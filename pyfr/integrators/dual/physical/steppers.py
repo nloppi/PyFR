@@ -1,20 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from pyfr.integrators.dual.base import BaseDualIntegrator
+from pyfr.integrators.dual.physical.base import BaseDualIntegrator
 
 
 class BaseDualStepper(BaseDualIntegrator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        elementscls = self.system.elementscls
-        self._subdims = [elementscls.convarmap[self.system.ndims].index(v)
-                         for v in elementscls.dualcoeffs[self.system.ndims]]
-
-    @property
-    def _stepper_nregs(self):
-        return self._pseudo_stepper_nregs + len(self._dual_time_source) - 1
-
 
 class DualBDF2Stepper(BaseDualStepper):
     stepper_name = 'bdf2'

@@ -7,9 +7,7 @@ import time
 import numpy as np
 
 from pyfr.inifile import Inifile
-from pyfr.mpiutil import get_comm_rank_root, get_mpi
 from pyfr.plugins import get_plugin
-from pyfr.util import memoize, proxylist
 
 
 class BaseIntegrator(object):
@@ -51,23 +49,11 @@ class BaseIntegrator(object):
         self._dt = cfg.getfloat('solver-time-integrator', 'dt')
         self.dtmin = cfg.getfloat('solver-time-integrator', 'dt-min', 1e-12)
 
-        # Determine the amount of temp storage required by this method
-        self.nreg = self._stepper_nregs
-
-        # Construct the relevant mesh partition
-        self._init_system(systemcls, backend, rallocs, mesh, initsoln)
-
-        # Storage for register banks and current index
-        self._init_reg_banks()
-
         # Extract the UUID of the mesh (to be saved with solutions)
         self.mesh_uuid = mesh['mesh_uuid']
 
         # Get a queue for subclasses to use
         self._queue = backend.queue()
-
-        # Global degree of freedom count
-        self._gndofs = self._get_gndofs()
 
         # Solution cache
         self._curr_soln = None
@@ -77,35 +63,6 @@ class BaseIntegrator(object):
 
         # Record the starting wall clock time
         self._wstart = time.time()
-
-        # Event handlers for advance_to
-        self.completed_step_handlers = proxylist(self._get_plugins())
-
-        # Delete the memory-intensive elements map from the system
-        del self.system.ele_map
-
-    def _init_system(self, systemcls, *args):
-        self.system = systemcls(*args, nreg=self.nreg, cfg=self.cfg)
-
-    def _init_reg_banks(self):
-        self._regs, self._regidx = [], list(range(self.nreg))
-        self._idxcurr = 0
-
-        # Create a proxylist of matrix-banks for each storage register
-        for i in self._regidx:
-            self._regs.append(
-                proxylist([self.backend.matrix_bank(em, i)
-                           for em in self.system.ele_banks])
-            )
-
-    def _get_gndofs(self):
-        comm, rank, root = get_comm_rank_root()
-
-        # Get the number of degrees of freedom in this partition
-        ndofs = sum(self.system.ele_ndofs)
-
-        # Sum to get the global number over all partitions
-        return comm.allreduce(ndofs, op=get_mpi('sum'))
 
     def _get_plugins(self):
         plugins = []
@@ -119,35 +76,6 @@ class BaseIntegrator(object):
                 plugins.append(get_plugin(name, self, cfgsect, suffix))
 
         return plugins
-
-    def _get_kernels(self, name, nargs, **kwargs):
-        # Transpose from [nregs][neletypes] to [neletypes][nregs]
-        transregs = zip(*self._regs)
-
-        # Generate an kernel for each element type
-        kerns = proxylist([])
-        for tr in transregs:
-            kerns.append(self.backend.kernel(name, *tr[:nargs], **kwargs))
-
-        return kerns
-
-    def _prepare_reg_banks(self, *bidxes):
-        for reg, ix in zip(self._regs, bidxes):
-            reg.active = ix
-
-    @memoize
-    def _get_axnpby_kerns(self, n, subdims=None, level=None):
-        return self._get_kernels('axnpby', nargs=n, subdims=subdims)
-
-    def _add(self, *args):
-        # Get a suitable set of axnpby kernels
-        axnpby = self._get_axnpby_kerns(len(args) // 2)
-
-        # Bank indices are in odd-numbered arguments
-        self._prepare_reg_banks(*args[1::2])
-
-        # Bind and run the axnpby kernels
-        self._queue % axnpby(*args[::2])
 
     def call_plugin_dt(self, dt):
         ta = self.tlist
@@ -164,30 +92,10 @@ class BaseIntegrator(object):
         tlist.extend(ta)
         tlist.extend(tb)
 
-    @property
-    def soln(self):
-        # If we do not have the solution cached then fetch it
-        if not self._curr_soln:
-            self._curr_soln = self.system.ele_scal_upts(self._idxcurr)
-
-        return self._curr_soln
-
     def step(self, t, dt):
         pass
 
     def advance_to(self, t):
-        pass
-
-    @property
-    def _stepper_nfevals(self):
-        pass
-
-    @property
-    def _stepper_nregs(self):
-        pass
-
-    @property
-    def _stepper_order(self):
         pass
 
     def run(self):
