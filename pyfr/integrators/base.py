@@ -11,20 +11,13 @@ from pyfr.plugins import get_plugin
 
 
 class BaseIntegrator(object):
-    def __init__(self, backend, systemcls, rallocs, mesh, initsoln, cfg):
+    def __init__(self, backend, rallocs, mesh, initsoln, cfg):
         self.backend = backend
         self.rallocs = rallocs
         self.isrestart = initsoln is not None
         self.cfg = cfg
         self.prevcfgs = {f: initsoln[f] for f in initsoln or []
                          if f.startswith('config-')}
-
-        # Ensure the system is compatible with our formulation
-        if self.formulation not in systemcls.elementscls.formulations:
-            raise RuntimeError(
-                'System {0} does not support time stepping formulation {1}'
-                .format(systemcls.name, self.formulation)
-            )
 
         # Start time
         self.tstart = cfg.getfloat('solver-time-integrator', 'tstart', 0.0)

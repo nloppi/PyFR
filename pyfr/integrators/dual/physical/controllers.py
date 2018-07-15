@@ -2,6 +2,7 @@
 
 from pyfr.integrators.dual.physical.base import BaseDualIntegrator
 
+
 class BaseDualController(BaseDualIntegrator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

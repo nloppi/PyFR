@@ -5,12 +5,11 @@ import re
 from pyfr.integrators.dual.pseudo.pseudocontrollers import BaseDualPseudoController
 from pyfr.integrators.dual.pseudo.pseudosteppers import BaseDualPseudoStepper
 from pyfr.integrators.dual.pseudo.multip import DualMultiPIntegrator
-
 from pyfr.util import subclass_where
+
 
 def get_pseudo_integrator(backend, systemcls, rallocs, mesh,
                           initsoln, cfg, tcoeffs):
-
     if 'solver-dual-time-integrator-multip' in cfg.sections():
         sect = 'solver-dual-time-integrator-multip'
 
@@ -21,34 +20,30 @@ def get_pseudo_integrator(backend, systemcls, rallocs, mesh,
         cycle, csteps = zip(*cfg.getliteral(sect, 'cycle'))
         levels = sorted(set(cycle), reverse=True)
 
-        multip_types = {}
-
         # Highest multip level
         pn = cfg.get('solver-time-integrator', 'pseudo-scheme')
         pc = subclass_where(BaseDualPseudoStepper, pseudo_stepper_name=pn)
         cn = cfg.get('solver-time-integrator', 'pseudo-controller')
 
-        # Generate suitable config files for lower multigrid levels
+        # Get multip types
+        multip_types = {}
         for l in levels:
             # No pseudo-control at lower levels
+            controller_name = 'none' if l != order else cn
             cc = subclass_where(BaseDualPseudoController,
-                                pseudo_controller_name='none' if l != order
-                                else cn)
+                                pseudo_controller_name=controller_name)
             bases = [(cn, cc), (pn, pc)]
             name = '_'.join(['dual_multip'] + list(bn for bn, bc in bases)
                             + ['pseudointegrator'])
-
             multip_types[l] = type(name, tuple(bc for bn, bc in bases),
                                    dict(name=name))
 
         return DualMultiPIntegrator(backend, systemcls, rallocs, mesh,
                                     initsoln, cfg, tcoeffs, multip_types)
-
     else:
         cn = cfg.get('solver-time-integrator', 'pseudo-controller')
         pn = cfg.get('solver-time-integrator', 'pseudo-scheme')
 
-        # Need to check here already to get none controller
         cc = subclass_where(BaseDualPseudoController, pseudo_controller_name=cn)
         pc = subclass_where(BaseDualPseudoStepper, pseudo_stepper_name=pn)
 

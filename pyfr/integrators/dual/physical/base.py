@@ -9,14 +9,13 @@ class BaseDualIntegrator(BaseIntegrator):
     formulation = 'dual'
 
     def __init__(self, backend, systemcls, rallocs, mesh, initsoln, cfg):
-
         # Composite the base classes together to form a new type
         self.pseudointegrator = get_pseudo_integrator(
             backend, systemcls, rallocs, mesh,
-            initsoln, cfg, self._dual_time_source
+            initsoln, cfg, self._stepper_coeffs
         )
 
-        super().__init__(backend, systemcls, rallocs, mesh, initsoln, cfg)
+        super().__init__(backend, rallocs, mesh, initsoln, cfg)
 
         # Event handlers for advance_to
         self.completed_step_handlers = proxylist(
@@ -31,7 +30,7 @@ class BaseDualIntegrator(BaseIntegrator):
         return self.pseudointegrator.system
 
     @property
-    def _dual_time_source(self):
+    def _stepper_coeffs(self):
         pass
 
     @property

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from pyfr.util import proxylist, memoize
 from pyfr.mpiutil import get_comm_rank_root, get_mpi
+from pyfr.util import memoize, proxylist
+
 
 class BaseCommon(object):
     def _init_reg_banks(self, backend, system):

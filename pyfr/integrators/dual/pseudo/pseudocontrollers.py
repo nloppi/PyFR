@@ -9,10 +9,9 @@ from pyfr.util import memoize
 
 class BaseDualPseudoController(BaseDualPseudoIntegrator):
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # Pseudo-step counter
         self.npseudosteps = 0
-
-        super().__init__(*args, **kwargs)
 
         # Solution filtering frequency
         self._fnsteps = self.cfg.getint('soln-filter', 'nsteps', '0')
@@ -80,11 +79,12 @@ class DualPseudoNoneController(BaseDualPseudoController):
         self.tcurr = tcurr
         self.dtau = max(min(tout - tcurr, self._dtau), self._dtaumin)
 
-        for i in range(self._maxniters):
+        for i in range(self.maxniters):
             # Take the step
             self._idxcurr, self._idxprev = self.step(self.tcurr, dt, self.dtau)
 
-            if self.conv_mon(i, self._minniters):
+            # Convergence monitoring
+            if self.conv_mon(i, self.minniters):
                 break
 
         # Update

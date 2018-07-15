@@ -9,7 +9,6 @@ class BaseStdIntegrator(BaseCommon, BaseIntegrator):
     formulation = 'std'
 
     def __init__(self, backend, systemcls, rallocs, mesh, initsoln, cfg):
-
         # Sanity checks
         if self._controller_needs_errest and not self._stepper_has_errest:
             raise TypeError('Incompatible stepper/controller combination')
@@ -17,11 +16,18 @@ class BaseStdIntegrator(BaseCommon, BaseIntegrator):
         # Determine the amount of temp storage required by this method
         self.nreg = self._stepper_nregs
 
+        # Ensure the system is compatible with our formulation
+        if self.formulation not in systemcls.elementscls.formulations:
+            raise RuntimeError(
+                'System {0} does not support time stepping formulation {1}'
+                .format(systemcls.name, self.formulation)
+            )
+
         # Construct the relevant mesh partition
         self.system = systemcls(backend, rallocs, mesh, initsoln,
                                 nreg=self._stepper_nregs, cfg=cfg)
 
-        super().__init__(backend, systemcls, rallocs, mesh, initsoln, cfg)
+        super().__init__(backend, rallocs, mesh, initsoln, cfg)
 
         # Storage for register banks and current index
         self._init_reg_banks(backend, self.system)

@@ -15,7 +15,6 @@ class DualMultiPIntegrator(BaseDualPseudoIntegrator):
         self.backend = backend
 
         sect = 'solver-dual-time-integrator-multip'
-
         # Get the solver order
         self._order = cfg.getint('solver', 'order')
 
@@ -71,10 +70,8 @@ class DualMultiPIntegrator(BaseDualPseudoIntegrator):
                 def finalise_pseudo_advance(self, *args, **kwargs):
                     pass
 
-            self.integrators[i] = lpsint(
-                backend, systemcls, rallocs, mesh, initsoln, mgcfgs[i],
-                tcoeffs
-            )
+            self.integrators[i] = lpsint(backend, systemcls, rallocs, mesh,
+                                         initsoln, mgcfgs[i], tcoeffs)
 
         # Get a convergence monitoring method from the highest level controller
         self.mg_conv_mon = multip_types[self._order].conv_mon
@@ -90,17 +87,17 @@ class DualMultiPIntegrator(BaseDualPseudoIntegrator):
             del self.integrators[l].system.ele_map
 
     def finalise_mg_advance(self, currsoln):
-        pnreg = self.integrator._pseudo_stepper_nregs
-        dtsnreg = len(self.integrator._dual_time_source)
+        psnregs = self.integrator._pseudo_stepper_nregs
+        snregs = self.integrator._stepper_nregs
 
-        # Rotate the source registers to the right by one
-        self.integrator._regidx[pnreg:pnreg + dtsnreg - 1] = (
-            self.integrator._source_regidx[-1:]
-            + self.integrator._source_regidx[:-1]
+        # Rotate the stepper registers to the right by one
+        self.integrator._regidx[psnregs:psnregs + snregs] = (
+            self.integrator._stepper_regidx[-1:] +
+            self.integrator._stepper_regidx[:-1]
         )
 
         # Copy the current soln into the first source register
-        self.integrator._add(0, self.integrator._regidx[pnreg], 1, currsoln)
+        self.integrator._add(0, self.integrator._regidx[psnregs], 1, currsoln)
 
     @property
     def _idxcurr(self):
@@ -145,7 +142,7 @@ class DualMultiPIntegrator(BaseDualPseudoIntegrator):
         )
 
     def restrict(self, l1, l2):
-        l1idxcurr  = self.integrators[l1]._idxcurr
+        l1idxcurr = self.integrators[l1]._idxcurr
         l2idxcurr = self.integrators[l2]._idxcurr
 
         l1sys, l2sys = self.integrators[l1].system, self.integrators[l2].system
@@ -185,10 +182,14 @@ class DualMultiPIntegrator(BaseDualPseudoIntegrator):
         # mg1 = Q^ns
         self.integrator._add(0, mg1, 1, l2idxcurr)
 
-        # Restrict the dt source terms
-        for i in range(len(self.integrator._source_regidx)):
-            l1sys.eles_scal_upts_inb.active = self.integrators[l1]._source_regidx[i]
-            l2sys.eles_scal_upts_inb.active = self.integrators[l2]._source_regidx[i]
+        # Restrict the physical stepper terms
+        for i in range(self.integrator._stepper_nregs):
+            l1sys.eles_scal_upts_inb.active = (
+                self.integrators[l1]._stepper_regidx[i]
+            )
+            l2sys.eles_scal_upts_inb.active = (
+                self.integrators[l2]._stepper_regidx[i]
+            )
             self.integrator._queue % self.mgproject(l1, l2)()
 
     def prolongate(self, l1, l2):
@@ -232,7 +233,7 @@ class DualMultiPIntegrator(BaseDualPseudoIntegrator):
             for l, m, n in it.zip_longest(cycle, cycle[1:], csteps):
                 self.level = l
                 # Set the number of smoothing steps at each level
-                self.integrator._maxniters = self.integrator._minniters = n
+                self.integrator.maxniters = self.integrator.minniters = n
 
                 self.integrator.pseudo_advance(tcurr, tout, dt)
 
@@ -241,6 +242,7 @@ class DualMultiPIntegrator(BaseDualPseudoIntegrator):
                 elif m is not None and l < m:
                     self.prolongate(l, m)
 
+            # Convergence monitoring
             if self.mg_conv_mon(self.integrator, i, self._minniters):
                  break
 
