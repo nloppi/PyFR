@@ -24,16 +24,16 @@ def get_pseudo_integrator(backend, systemcls, rallocs, mesh,
         pn = cfg.get('solver-time-integrator', 'pseudo-scheme')
         pc = subclass_where(BaseDualPseudoStepper, pseudo_stepper_name=pn)
         cn = cfg.get('solver-time-integrator', 'pseudo-controller')
-
+        cc = subclass_where(BaseDualPseudoController, pseudo_controller_name=cn)
+        cc_none = subclass_where(BaseDualPseudoController,
+                                 pseudo_controller_name='none')
         # Get multip types
         multip_types = {}
         for l in levels:
             # No pseudo-control at lower levels
-            controller_name = 'none' if l != order else cn
-            cc = subclass_where(BaseDualPseudoController,
-                                pseudo_controller_name=controller_name)
+            cc = cc if l == order else cc_none
             bases = [(cn, cc), (pn, pc)]
-            name = '_'.join(['dual_multip'] + list(bn for bn, bc in bases) +
+            name = '_'.join(['dualP' + str(l)] + list(bn for bn, bc in bases) +
                             ['pseudointegrator'])
             multip_types[l] = type(name, tuple(bc for bn, bc in bases),
                                    dict(name=name))
