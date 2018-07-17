@@ -9,13 +9,12 @@ class BaseDualIntegrator(BaseIntegrator):
     formulation = 'dual'
 
     def __init__(self, backend, systemcls, rallocs, mesh, initsoln, cfg):
-        # Composite the base classes together to form a new type
+        super().__init__(backend, rallocs, mesh, initsoln, cfg)
+        # Get the pseudo-integrator
         self.pseudointegrator = get_pseudo_integrator(
             backend, systemcls, rallocs, mesh,
             initsoln, cfg, self._stepper_coeffs
         )
-
-        super().__init__(backend, rallocs, mesh, initsoln, cfg)
 
         # Event handlers for advance_to
         self.completed_step_handlers = proxylist(
@@ -35,14 +34,13 @@ class BaseDualIntegrator(BaseIntegrator):
 
     @property
     def pseudostepinfo(self):
-        # Stats on the most recent step
         return self.pseudointegrator.pseudostepinfo
 
     @property
     def soln(self):
         # If we do not have the solution cached then fetch it
         if not self._curr_soln:
-            self._curr_soln = self.pseudointegrator.system.ele_scal_upts(
+            self._curr_soln = self.system.ele_scal_upts(
                 self.pseudointegrator._idxcurr
             )
 

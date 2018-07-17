@@ -25,12 +25,6 @@ class BaseDualPseudoStepper(BaseDualPseudoIntegrator):
         self._prepare_reg_banks(fout, self._idxcurr, *self._stepper_regidx)
         self._queue % axnpby(1, *svals)
 
-        # Multigrid r addition
-        if self._multip_regidx:
-            axnpby = self._get_axnpby_kerns(2)
-            self._prepare_reg_banks(fout, self._multip_regidx[0])
-            self._queue % axnpby(1, -1)
-
 
 class DualPseudoEulerStepper(BaseDualPseudoStepper):
     pseudo_stepper_name = 'euler'

@@ -59,16 +59,43 @@ class DualMultiPIntegrator(BaseDualPseudoIntegrator):
         # Insert the original config file to the multigrid config dictionary
         mgcfgs[self._order] = cfg
 
+        # Get pseudo-integrators at all multigrid levels
         self.integrators = {}
         for i, psint in multip_types.items():
+            # A class that bypasses pseudo-controller methods within a cycle
             class lpsint(psint):
                 aux_nregs = 2 if i != self._order else 0
+
+                @property
+                def _aux_regidx(self):
+                    return (self._regidx[-2:]
+                            if self.aux_nregs is not 0 else None)
 
                 def conv_mon(self, *args, **kwargs):
                     pass
 
                 def finalise_pseudo_advance(self, *args, **kwargs):
                     pass
+
+                def _rhs_with_dts(self, t, uin, fout, c=1):
+                    # Compute -∇·f
+                    self.system.rhs(t, uin, fout)
+
+                    # Coefficients for the physical stepper
+                    svals = [c*sc for sc in self._stepper_coeffs]
+
+                    # Physical stepper source addition -∇·f - dQ/dt
+                    axnpby = self._get_axnpby_kerns(len(svals) + 1,
+                                                    subdims=self._subdims)
+                    self._prepare_reg_banks(fout, self._idxcurr,
+                                            *self._stepper_regidx)
+                    self._queue % axnpby(1, *svals)
+
+                    # Multigrid r addition
+                    if self._aux_regidx:
+                        axnpby = self._get_axnpby_kerns(2)
+                        self._prepare_reg_banks(fout, self._aux_regidx[0])
+                        self._queue % axnpby(1, -1)
 
             self.integrators[i] = lpsint(backend, systemcls, rallocs, mesh,
                                          initsoln, mgcfgs[i], tcoeffs)
@@ -221,7 +248,7 @@ class DualMultiPIntegrator(BaseDualPseudoIntegrator):
             raise AttributeError('_mg_regidx not defined when'
                                  ' self.level == self._order')
 
-        return self.integrator._regidx[-2:]
+        return self.integrator._aux_regidx[-2:]
 
     def pseudo_advance(self, tcurr, tout, dt):
         # Multigrid levels and step counts

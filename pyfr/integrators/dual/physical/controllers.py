@@ -43,6 +43,4 @@ class DualNoneController(BaseDualController):
             dt = max(min(t - self.tcurr, self._dt), self.dtmin)
 
             self.pseudointegrator.pseudo_advance(self.tcurr, t, dt)
-
-            # We are not adaptive, so accept every step
             self._accept_step(dt, self.pseudointegrator._idxcurr)

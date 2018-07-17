@@ -18,6 +18,7 @@ def get_integrator(backend, systemcls, rallocs, mesh, initsoln, cfg):
         sc = subclass_where(BaseStdStepper, stepper_name=sn)
 
         bases = [(cn, cc), (sn, sc)]
+
     elif form == 'dual':
         cn = cfg.get('solver-time-integrator', 'controller')
         sn = cfg.get('solver-time-integrator', 'scheme')

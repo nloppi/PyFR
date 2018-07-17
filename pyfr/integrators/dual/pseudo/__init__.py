@@ -33,8 +33,8 @@ def get_pseudo_integrator(backend, systemcls, rallocs, mesh,
             cc = subclass_where(BaseDualPseudoController,
                                 pseudo_controller_name=controller_name)
             bases = [(cn, cc), (pn, pc)]
-            name = '_'.join(['dual_multip'] + list(bn for bn, bc in bases)
-                            + ['pseudointegrator'])
+            name = '_'.join(['dual_multip'] + list(bn for bn, bc in bases) +
+                            ['pseudointegrator'])
             multip_types[l] = type(name, tuple(bc for bn, bc in bases),
                                    dict(name=name))
 
@@ -56,6 +56,7 @@ def get_pseudo_integrator(backend, systemcls, rallocs, mesh,
 
         pseudointegrator = type(name, tuple(bc for bn, bc in bases),
                                 dict(name=name))
+
         # Construct and return an instance of this new integrator class
         return pseudointegrator(backend, systemcls, rallocs, mesh,
                                 initsoln, cfg, tcoeffs)

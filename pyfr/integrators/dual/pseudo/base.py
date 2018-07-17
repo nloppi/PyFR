@@ -2,20 +2,16 @@
 
 from collections import defaultdict
 
-from pyfr.integrators.basecommon import BaseCommon
+from pyfr.integrators.base import BaseCommon
 from pyfr.util import proxylist
 
 
-class BaseDualPseudoIntegrator(BaseCommon, object):
+class BaseDualPseudoIntegrator(BaseCommon):
     formulation = 'dual'
     aux_nregs = 0
 
     def __init__(self, backend, systemcls, rallocs, mesh,
                  initsoln, cfg, stepper_coeffs):
-        # Sanity checks
-        if self._controller_needs_lerrest and not self._stepper_has_lerrest:
-            raise TypeError('Incompatible stepper/controller combination')
-
         self.backend = backend
         self.rallocs = rallocs
         self.isrestart = initsoln is not None
@@ -43,32 +39,18 @@ class BaseDualPseudoIntegrator(BaseCommon, object):
         self._stepper_nregs = len(stepper_coeffs) - 1
 
         # Determine the amount of temp storage required in total
-        self.nreg = (self._pseudo_stepper_nregs + self._stepper_nregs +
-                     self.aux_nregs)
-
-        # Check if multip integrator
-        self.multip = 'multip' in self.name
+        self.nregs = (self._pseudo_stepper_nregs + self._stepper_nregs +
+                      self.aux_nregs)
 
         # Physical stepper coefficients
         self._stepper_coeffs = stepper_coeffs
 
-        # Ensure the system is compatible with our formulation
-        if self.formulation not in systemcls.elementscls.formulations:
-            raise RuntimeError(
-                'System {0} does not support time stepping formulation {1}'
-                .format(systemcls.name, self.formulation)
-            )
-
         # Construct the relevant mesh partition
         self.system = systemcls(backend, rallocs, mesh, initsoln,
-                                nreg=self.nreg, cfg=cfg)
+                                nregs=self.nregs, cfg=cfg)
 
         # Storage for register banks and current index
         self._init_reg_banks(backend, self.system)
-
-        # Additional registers for multip if present
-        self._multip_regidx = (self._regidx[-2:]
-                               if self.aux_nregs is not 0 else None)
 
         # Get a queue for subclasses to use
         self._queue = backend.queue()
