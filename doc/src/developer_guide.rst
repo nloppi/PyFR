@@ -43,7 +43,7 @@ available in PyFR |release|:
     :exclude-members: _abc_cache, _abc_negative_cache,
                       _abc_negative_cache_version, _abc_registry
 
-.. autoclass:: pyfr.integrators.dual.controllers.DualNoneController
+.. autoclass:: pyfr.integrators.dual.physical.controllers.DualNoneController
     :members:
     :undoc-members:
     :inherited-members:
@@ -51,12 +51,20 @@ available in PyFR |release|:
     :exclude-members: _abc_cache, _abc_negative_cache,
                       _abc_negative_cache_version, _abc_registry
 
+.. autoclass:: pyfr.integrators.dual.pseudo.pseudocontrollers.DualPseudoNoneController
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
 
 Types of `Controller`_ are related via the following inheritance
 diagram:
 
 .. inheritance-diagram:: pyfr.integrators.std.controllers
-                         pyfr.integrators.dual.controllers
+                         pyfr.integrators.dual.physical.controllers
+                         pyfr.integrators.dual.pseudo.pseudocontrollers
     :parts: 1
 
 Stepper
@@ -107,7 +115,7 @@ advances a `System`_ by a single time-step. There are 11 types of
     :exclude-members: _abc_cache, _abc_negative_cache,
                       _abc_negative_cache_version, _abc_registry
 
-.. autoclass:: pyfr.integrators.dual.steppers.DualBDF2Stepper
+.. autoclass:: pyfr.integrators.dual.physical.steppers.DualBDF2Stepper
     :members:
     :undoc-members:
     :inherited-members:
@@ -115,7 +123,7 @@ advances a `System`_ by a single time-step. There are 11 types of
     :exclude-members: _abc_cache, _abc_negative_cache,
                       _abc_negative_cache_version, _abc_registry
 
-.. autoclass:: pyfr.integrators.dual.steppers.DualBDF3Stepper
+.. autoclass:: pyfr.integrators.dual.physical.steppers.DualBDF3Stepper
     :members:
     :undoc-members:
     :inherited-members:
@@ -123,22 +131,14 @@ advances a `System`_ by a single time-step. There are 11 types of
     :exclude-members: _abc_cache, _abc_negative_cache,
                       _abc_negative_cache_version, _abc_registry
 
-.. autoclass:: pyfr.integrators.dual.steppers.DualBackwardEulerStepper
+.. autoclass:: pyfr.integrators.dual.physical.steppers.DualBackwardEulerStepper
     :members:
     :undoc-members:
     :inherited-members:
     :private-members:
     :exclude-members: _abc_cache, _abc_negative_cache,
                       _abc_negative_cache_version, _abc_registry
-.. autoclass:: pyfr.integrators.dual.pseudosteppers.DualPseudoRK4Stepper
-    :members:
-    :undoc-members:
-    :inherited-members:
-    :private-members:
-    :exclude-members: _abc_cache, _abc_negative_cache,
-                      _abc_negative_cache_version, _abc_registry
-
-.. autoclass:: pyfr.integrators.dual.pseudosteppers.DualPseudoTVDRK3Stepper
+.. autoclass:: pyfr.integrators.dual.pseudo.pseudosteppers.DualPseudoRK4Stepper
     :members:
     :undoc-members:
     :inherited-members:
@@ -146,7 +146,15 @@ advances a `System`_ by a single time-step. There are 11 types of
     :exclude-members: _abc_cache, _abc_negative_cache,
                       _abc_negative_cache_version, _abc_registry
 
-.. autoclass:: pyfr.integrators.dual.pseudosteppers.DualPseudoEulerStepper
+.. autoclass:: pyfr.integrators.dual.pseudo.pseudosteppers.DualPseudoTVDRK3Stepper
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :private-members:
+    :exclude-members: _abc_cache, _abc_negative_cache,
+                      _abc_negative_cache_version, _abc_registry
+
+.. autoclass:: pyfr.integrators.dual.pseudo.pseudosteppers.DualPseudoEulerStepper
     :members:
     :undoc-members:
     :inherited-members:
@@ -156,8 +164,8 @@ advances a `System`_ by a single time-step. There are 11 types of
 
 Types of `Stepper`_ are related via the following inheritance diagram:
 
-.. inheritance-diagram:: pyfr.integrators.dual.steppers
-                         pyfr.integrators.dual.pseudosteppers
+.. inheritance-diagram:: pyfr.integrators.dual.physical.steppers
+                         pyfr.integrators.dual.pseudo.pseudosteppers
                          pyfr.integrators.std.steppers
     :parts: 1
 
